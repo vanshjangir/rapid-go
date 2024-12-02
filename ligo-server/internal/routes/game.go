@@ -29,7 +29,7 @@ const (
 func handleMove(p *core.Player, msgBytes []byte, ) error {
 
     var moveMsg core.MoveMsg
-    var moveStatus core.MoveStatus
+    var moveStatus core.MoveStatusMsg
 
     moveMsg.Type = "move"
     moveStatus.Type = "movestatus"
@@ -104,6 +104,23 @@ func handleGameOver(p *core.Player, winner int) {
     }
 }
 
+func handleSyncState(p *core.Player) {
+    var syncMsg core.SyncMsg
+    syncMsg.Type = "sync"
+    syncMsg.Color = p.Color
+    syncMsg.GameId = p.Game.Id
+    if p.Game.Turn == p.Color {
+        syncMsg.Turn = true
+    }
+    syncMsg.State = p.Game.State
+    syncMsg.Liberty = p.Game.Liberty
+    syncMsg.History = string(p.Game.History)
+
+    if err := p.SelfConn.WriteJSON(syncMsg); err != nil {
+        log.Println("Error sending sync msg:", err)
+    }
+}
+
 func playGame(p *core.Player) {
     defer p.SelfConn.Close()
 
@@ -133,22 +150,20 @@ func playGame(p *core.Player) {
                 break gameloop
             }
 
-        case "pass":
-            passMsg := new(core.PassMsg)
-            passMsg.Type = "pass"
-
-            p.Game.History = append(p.Game.History, []byte("pp")...)
-            
-            if err := p.OpConn.WriteJSON(passMsg); err != nil {
-                log.Println("Error sending pass msg to op:", err)
-            }
-
-            if ok, winner := p.Game.IsOver(); ok {
-                handleGameOver(p, winner)
-                break gameloop
-            }
-
         case "abort":
+            winner := p.Color
+            if winner == 1 {
+                winner = 0
+            } else {
+                winner = 1
+            }
+            handleGameOver(p, winner)
+            break gameloop
+
+        case "reqState":
+            handleSyncState(p)
+
+        case "chat":
         }
 
     }

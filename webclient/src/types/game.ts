@@ -37,11 +37,21 @@ export interface MsgMove {
   move: string;
 }
 
+export interface MsgSync {
+  type: "sync";
+  gameId: string;
+  color: number;
+  state: number[][];
+  liberty: number[][];
+  turn: boolean;
+  history: string;
+}
+
 export interface GameState {
   gameId: string;
   color: number;
   state: number[][];
   liberty: number[][];
   turn: boolean;
-  history: string[];
+  history: string;
 }

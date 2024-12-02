@@ -51,10 +51,6 @@ type MoveMsg struct {
     Move    string  `json:"move"`
 }
 
-type PassMsg struct {
-    Type    string  `json:"type"`
-}
-
 type AbortMsg struct {
     Type    string  `json:"type"`
 }
@@ -67,11 +63,30 @@ type LoseMsg struct {
     Type    string  `json:"type"`
 }
 
-type MoveStatus struct {
+type MoveStatusMsg struct {
     Type        string  `json:"type"`
     TurnStatus  bool    `json:"turnStatus"`
     MoveStatus  bool    `json:"moveStatus"`
     Move        string  `json:"move"`
+}
+
+type ReqStateMsg struct {
+    Type    string  `json:"type"`
+}
+
+type SyncMsg struct {
+    Type    string          `json:"type"`
+    GameId  string          `json:"gameId"`
+    Color   int             `json:"color"`
+    Turn    bool            `json:"turn"`
+    Liberty [19][19]int     `json:"liberty"`
+    State   [19][19]int     `json:"state"`
+    History string          `json:"history"`
+}
+
+type ChatMsg struct {
+    Type    string  `json:"string"`
+    Message string  `json:"message"`
 }
 
 func (g *Game) InitGame() {
@@ -98,6 +113,7 @@ func (g *Game) CheckValidMove(move string, color int) bool {
     if err != nil {
         return false
     }
+    row -= 1
 
     if g.State[col][row] != EMPTY_CELL {
         return false
@@ -230,6 +246,7 @@ func (g *Game) UpdateState(move string, color int) {
     if err != nil {
         return
     }
+    row -= 1
 
     if(color == 1){
         g.State[col][row] = BLACK_CELL

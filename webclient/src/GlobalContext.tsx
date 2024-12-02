@@ -1,12 +1,15 @@
 import React, { createContext, useContext, useRef, ReactNode } from "react";
 
 interface GlobalContextType {
-  connect: (url: string) => WebSocket;
-  getSocket : () => WebSocket | null;
   player: {
     gameId: string;
     color: number;
   };
+  isLoggedIn: boolean;
+  username: string;
+  setUsername: (username: string) => void;
+  connect: (url: string, header: any) => WebSocket;
+  getSocket : () => WebSocket | null;
 }
 
 interface GlobalProps {
@@ -22,20 +25,35 @@ export const GlobalProvider: React.FC<GlobalProps> = ({ children }) => {
     color: 1,
   };
 
+  const user = localStorage.getItem('username');
+  let username: string = "";
+  let isLoggedIn: boolean = false;
+
+  if (user) {
+    username = user;
+    isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+  }
+
+  const setUsername = (user: string) => {
+    username = user;
+    isLoggedIn = true;
+    
+    localStorage.setItem('username', user);
+    localStorage.setItem('isLoggedIn', 'true');
+  };
+
   const socketRef = useRef<WebSocket | null>(null);
-
   const getSocket = (): WebSocket | null => socketRef.current;
-
-  const connect = (url: string): WebSocket => {
+  const connect = (url: string, header: any): WebSocket => {
     if(!socketRef.current){
-      socketRef.current = new WebSocket(url);
+      socketRef.current = new WebSocket(url, header);
     }
     return socketRef.current;
   }
 
 
   return (
-    <globalCtx.Provider value={{connect, getSocket, player}}>
+    <globalCtx.Provider value={{connect, getSocket, player, isLoggedIn, username, setUsername}}>
       {children}
     </globalCtx.Provider>
   )
