@@ -2,6 +2,8 @@ package core
 
 import (
     "strconv"
+    "time"
+
     "github.com/gorilla/websocket"
 )
 
@@ -16,6 +18,8 @@ const (
 type Game struct {
     P1          *Player
     P2          *Player
+    clk1        Clock
+    clk2        Clock
     Id          string
     State       [19][19]int
     Liberty     [19][19]int
@@ -29,6 +33,11 @@ type Player struct {
     SelfConn    *websocket.Conn
     OpConn      *websocket.Conn
     Color       int
+}
+
+type Clock struct {
+    start       time.Time
+    spent       int64
 }
 
 type MsgType struct {
@@ -47,8 +56,10 @@ type StopMsg struct {
 }
 
 type MoveMsg struct {
-    Type    string  `json:"type"`
-    Move    string  `json:"move"`
+    Type        string  `json:"type"`
+    Move        string  `json:"move"`
+    SelfTime    int64   `json:"selfTime"`
+    OpTime      int64   `json:"opTime"`
 }
 
 type AbortMsg struct {
@@ -67,6 +78,8 @@ type MoveStatusMsg struct {
     Type        string  `json:"type"`
     TurnStatus  bool    `json:"turnStatus"`
     MoveStatus  bool    `json:"moveStatus"`
+    SelfTime    int64   `json:"selfTime"`
+    OpTime      int64   `json:"opTime"`
     Move        string  `json:"move"`
 }
 
@@ -95,11 +108,50 @@ func (g *Game) InitGame() {
     g.P1.OpConn = g.P2.SelfConn
     g.P2.OpConn = g.P1.SelfConn
     g.Turn = 1
+    g.clk1.start = time.Now()
+    g.clk1.spent = 0
+    g.clk2.spent = 0
 
     for i := 0; i < 19; i++ {
         for j := 0; j < 19; j++ {
             g.State[i][j] = EMPTY_CELL
         }
+    }
+}
+
+func (g *Game) CheckTimeout() bool {
+    if g.Turn == g.P1.Color {
+        diff := time.Now().Sub(g.clk1.start).Milliseconds()
+        if diff > 900000 {
+            return true
+        } else {
+            return false
+        }
+    } else {
+        diff := time.Now().Sub(g.clk2.start).Milliseconds()
+        if diff > 900000 {
+            return true
+        } else {
+            return false
+        }
+    }
+}
+
+func (g *Game) TapClock(color int) {
+    if color == g.P1.Color {
+        g.clk1.spent += time.Now().Sub(g.clk1.start).Milliseconds()
+        g.clk2.start = time.Now()
+    } else {
+        g.clk2.spent += time.Now().Sub(g.clk2.start).Milliseconds()
+        g.clk1.start = time.Now()
+    }
+}
+
+func (g *Game) GetTime(color int) int64 {
+    if color == g.P1.Color {
+        return g.clk1.spent
+    } else {
+        return g.clk2.spent
     }
 }
 
@@ -236,6 +288,10 @@ func (g *Game) updateLiberties(col int, row int, color int) {
 }
 
 func (g *Game) UpdateState(move string, color int) {
+    if len(g.History) == 0 {
+        g.clk2.start = time.Now()
+    }
+
     if move == "ps" {
         g.History = append(g.History, []byte(move)...)
         return

@@ -18,11 +18,11 @@ export interface MsgAbort {
 }
 
 export interface MsgWin {
-  type: string;
+  type: "win";
 }
 
 export interface MsgLose {
-  type: string;
+  type: "lose";
 }
 
 export interface MsgMoveStatus {
@@ -30,11 +30,15 @@ export interface MsgMoveStatus {
   turnStatus: string;
   moveStatus: string;
   move: string;
+  selfTime: number;
+  opTime: number;
 }
 
 export interface MsgMove {
   type: "move";
   move: string;
+  selfTime: number;
+  opTime: number;
 }
 
 export interface MsgSync {

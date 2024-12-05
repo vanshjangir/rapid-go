@@ -3,6 +3,7 @@ package routes
 import (
     "fmt"
     "log"
+    "time"
     "net/http"
     "encoding/json"
     "github.com/gin-gonic/gin"
@@ -62,10 +63,24 @@ func handleMove(p *core.Player, msgBytes []byte, ) error {
         p.Game.Turn = 1
     }
 
+    p.Game.TapClock(p.Color)
+
     moveStatus.MoveStatus = true
     moveStatus.TurnStatus = true
     moveStatus.Move = moveMsg.Move
-    p.SelfConn.WriteJSON(moveStatus)
+    moveStatus.SelfTime = p.Game.GetTime(p.Color)
+    if p.Color == 1 {
+        moveStatus.OpTime = p.Game.GetTime(0)
+    } else {
+        moveStatus.OpTime = p.Game.GetTime(1)
+    }
+
+    if err := p.SelfConn.WriteJSON(moveStatus); err != nil {
+        return fmt.Errorf("Error sending move msg: %v", err)
+    }
+    
+    moveMsg.OpTime = moveStatus.SelfTime
+    moveMsg.SelfTime = moveStatus.OpTime
 
     if err := p.OpConn.WriteJSON(moveMsg); err != nil {
         return fmt.Errorf("Error sending move msg: %v", err)
@@ -74,33 +89,33 @@ func handleMove(p *core.Player, msgBytes []byte, ) error {
     return nil
 }
 
-func handleGameOver(p *core.Player, winner int) {
+func handleGameOver(g *core.Game, winner int) {
     winMsg := new(core.WinMsg)
-    winMsg.Type = "win"
     loseMsg := new(core.LoseMsg)
+    winMsg.Type = "win"
     loseMsg.Type = "lose"
 
-    if p.Color == winner {
-        if err := p.SelfConn.WriteJSON(winMsg); err != nil {
-            log.Println("Error sending win msg to p:", err)
-        }
+    wConn  := g.P1.SelfConn
+    lConn  := g.P2.SelfConn
+    if winner == g.P2.Color {
+        wConn = g.P2.SelfConn
+        lConn = g.P1.SelfConn
+    }
 
-        if err := p.OpConn.WriteJSON(loseMsg); err != nil {
-            log.Println("Error sending lose msg to op:", err)
-        }
-    } else {
-        if err := p.SelfConn.WriteJSON(loseMsg); err != nil {
-            log.Println("Error sending lose msg to p:", err)
-        }
+    if err := wConn.WriteJSON(winMsg); err != nil {
+        log.Println("Error sending win msg to p:", err)
+    }
 
-        if err := p.OpConn.WriteJSON(winMsg); err != nil {
-            log.Println("Error sending win msg to op:", err)
-        }
+    if err := lConn.WriteJSON(loseMsg); err != nil {
+        log.Println("Error sending lose msg to op:", err)
     }
     
+    if err := wConn.Close(); err != nil {
+        log.Println("Error closing conn winner:", err)
+    }
     
-    if err := p.OpConn.Close(); err != nil {
-        log.Println("Error closing conn op:", err)
+    if err := lConn.Close(); err != nil {
+        log.Println("Error closing conn loser:", err)
     }
 }
 
@@ -121,54 +136,57 @@ func handleSyncState(p *core.Player) {
     }
 }
 
-func playGame(p *core.Player) {
-    defer p.SelfConn.Close()
-
-    gameloop:
-    for{
-        _, msgBytes, err := p.SelfConn.ReadMessage()
-        if err != nil {
-            log.Println("Error reading message:", err)
-            break gameloop
-        }
-
-        var msg core.MsgType
-        if err := json.Unmarshal(msgBytes, &msg); err != nil {
-            log.Println("Error unmarshling msg type:", err)
-            break gameloop
-        }
-
-        switch msg.Type {
-        case "move":
-            if err := handleMove(p, msgBytes); err != nil {
-                log.Println(err)
-                break gameloop
-            }
-
-            if ok, winner := p.Game.IsOver(); ok {
-                handleGameOver(p, winner)
-                break gameloop
-            }
-
-        case "abort":
-            winner := p.Color
-            if winner == 1 {
-                winner = 0
-            } else {
-                winner = 1
-            }
-            handleGameOver(p, winner)
-            break gameloop
-
-        case "reqState":
-            handleSyncState(p)
-
-        case "chat":
-        }
-
+func handleRecv (p *core.Player) error {
+    _, msgBytes, err := p.SelfConn.ReadMessage()
+    if err != nil {
+        return fmt.Errorf("Error in reading on player %v: %v", p.Color, err)
     }
 
-    log.Println("Game Ends")
+    var msg core.MsgType
+    if err := json.Unmarshal(msgBytes, &msg); err != nil {
+        return fmt.Errorf("Error unmarshaling msg type: %v", err)
+    }
+
+    switch msg.Type {
+    case "move":
+        if err := handleMove(p, msgBytes); err != nil {
+            return err
+        }
+
+        if ok, winner := p.Game.IsOver(); ok {
+            handleGameOver(p.Game, winner)
+            return fmt.Errorf("Game Over by move")
+        }
+
+    case "abort":
+        winner := 1 - p.Color
+        handleGameOver(p.Game, winner)
+        return fmt.Errorf("Game over by abort")
+
+    case "reqState":
+        handleSyncState(p)
+
+    case "chat":
+    }
+
+    return nil
+}
+
+func playGame(p *core.Player, over chan bool) {
+    defer p.SelfConn.Close()
+    for {
+        if err := handleRecv(p); err != nil {
+            log.Println(err)
+            break
+        }
+    }
+
+    select {
+    case <-over:
+    default:
+        close(over)
+    }
+    log.Println("Connection Ends from Player", p.Color)
 }
 
 func startGame(game *core.Game) {
@@ -177,9 +195,26 @@ func startGame(game *core.Game) {
     game.InitGame()
     game.P1.SelfConn.WriteJSON(core.StartMsg{Start: 1, Color: 1, GameId: "gameId"})
     game.P2.SelfConn.WriteJSON(core.StartMsg{Start: 1, Color: 0, GameId: "gameId"})
-    
-    go playGame(game.P1)
-    go playGame(game.P2)
+   
+    over := make(chan bool)
+    go playGame(game.P1, over)
+    go playGame(game.P2, over)
+    go func(g *core.Game, over chan bool) {
+        for {
+            select{
+            case <- over:
+                return
+            default:
+                if game.CheckTimeout() {
+                    winner := 1 - g.Turn
+                    handleGameOver(g, winner)
+                    log.Println("Game over by timeout")
+                    return
+                }
+                time.Sleep(1 * time.Second)
+            }
+        }
+    }(game, over)
 }
 
 func ConnectPlayer(ctx *gin.Context) {
