@@ -8,6 +8,7 @@ import (
     "github.com/joho/godotenv"
     _ "github.com/lib/pq"
 
+    "github.com/vanshjangir/ligo/ligo-server/internal/core"
     "github.com/vanshjangir/ligo/ligo-server/internal/routes"
     "github.com/vanshjangir/ligo/ligo-server/internal/database"
     "github.com/vanshjangir/ligo/ligo-server/internal/middleware"
@@ -30,6 +31,8 @@ func main(){
         log.Fatal("Error loading env variables: ", err);
         return
     }
+
+    routes.Pmap = make(map[string]*core.Game)
 
     db := database.ConnectDatabase()
     defer db.Close()

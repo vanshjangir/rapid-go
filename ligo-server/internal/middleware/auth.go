@@ -60,7 +60,12 @@ func Auth(ctx *gin.Context) {
             return
         }
         fmt.Printf("JWT verified. Claims: %+v\n", token.Claims)
-        ctx.Set("userClaims", token.Claims)
+        claims, ok := token.Claims.(jwt.MapClaims)
+        if !ok {
+            ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid claims"})
+            ctx.Abort()
+        }
+        ctx.Set("username", claims["username"])
         ctx.Next()
     case TOKEN_TYPE_OAUTH:
     default:

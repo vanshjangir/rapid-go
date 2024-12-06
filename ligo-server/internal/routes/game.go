@@ -11,7 +11,9 @@ import (
     "github.com/vanshjangir/ligo/ligo-server/internal/core"
 )
 
+var Pmap map[string]*core.Game;
 var pendingWS *websocket.Conn = nil
+var pendingUN string = ""
 var upgrader = websocket.Upgrader{
     CheckOrigin: func(r *http.Request) bool {
         return true
@@ -117,6 +119,9 @@ func handleGameOver(g *core.Game, winner int) {
     if err := lConn.Close(); err != nil {
         log.Println("Error closing conn loser:", err)
     }
+
+    Pmap[g.P1.Username] = nil
+    Pmap[g.P2.Username] = nil
 }
 
 func handleSyncState(p *core.Player) {
@@ -139,6 +144,8 @@ func handleSyncState(p *core.Player) {
 func handleRecv (p *core.Player) error {
     _, msgBytes, err := p.SelfConn.ReadMessage()
     if err != nil {
+        p.DisConn = true
+        p.DisConnTime.Start = time.Now()
         return fmt.Errorf("Error in reading on player %v: %v", p.Color, err)
     }
 
@@ -155,12 +162,14 @@ func handleRecv (p *core.Player) error {
 
         if ok, winner := p.Game.IsOver(); ok {
             handleGameOver(p.Game, winner)
+            close(p.Game.Over)
             return fmt.Errorf("Game Over by move")
         }
 
     case "abort":
         winner := 1 - p.Color
         handleGameOver(p.Game, winner)
+        close(p.Game.Over)
         return fmt.Errorf("Game over by abort")
 
     case "reqState":
@@ -172,21 +181,48 @@ func handleRecv (p *core.Player) error {
     return nil
 }
 
-func playGame(p *core.Player, over chan bool) {
+func playGame(p *core.Player) {
     defer p.SelfConn.Close()
     for {
         if err := handleRecv(p); err != nil {
             log.Println(err)
+        }
+
+        if p.DisConn {
             break
         }
     }
 
-    select {
-    case <-over:
-    default:
-        close(over)
-    }
     log.Println("Connection Ends from Player", p.Color)
+}
+
+func monitorTimeout(g *core.Game) {
+    for {
+        select{
+        case <- g.Over:
+            return
+        default:
+            if g.P1.DisConn && g.P1.CheckDisConnTime() {
+                winner := 1 - g.P1.Color
+                handleGameOver(g, winner)
+                log.Println("Game over by disconnection")
+                return
+            }
+            if g.P2.DisConn && g.P2.CheckDisConnTime() {
+                winner := 1 - g.P2.Color
+                handleGameOver(g, winner)
+                log.Println("Game over by disconnection")
+                return
+            }
+            if g.CheckTimeout() {
+                winner := 1 - g.Turn
+                handleGameOver(g, winner)
+                log.Println("Game over by timeout")
+                return
+            }
+            time.Sleep(1 * time.Second)
+        }
+    }
 }
 
 func startGame(game *core.Game) {
@@ -195,38 +231,84 @@ func startGame(game *core.Game) {
     game.InitGame()
     game.P1.SelfConn.WriteJSON(core.StartMsg{Start: 1, Color: 1, GameId: "gameId"})
     game.P2.SelfConn.WriteJSON(core.StartMsg{Start: 1, Color: 0, GameId: "gameId"})
+    
+    Pmap[game.P1.Username] = game
+    Pmap[game.P2.Username] = game
    
-    over := make(chan bool)
-    go playGame(game.P1, over)
-    go playGame(game.P2, over)
-    go func(g *core.Game, over chan bool) {
-        for {
-            select{
-            case <- over:
-                return
-            default:
-                if game.CheckTimeout() {
-                    winner := 1 - g.Turn
-                    handleGameOver(g, winner)
-                    log.Println("Game over by timeout")
-                    return
-                }
-                time.Sleep(1 * time.Second)
-            }
-        }
-    }(game, over)
+    game.Over = make(chan bool)
+    go playGame(game.P1)
+    go playGame(game.P2)
+    go monitorTimeout(game)
+}
+
+func reconnect(username string, c *websocket.Conn) bool {
+    game, ok := Pmap[username]
+    if !ok {
+        return false
+    }
+
+    if game.P1.Username == username {
+        game.P1.DisConn = false
+        game.P1.SelfConn = c
+        game.P2.OpConn = c
+
+        game.P1.SelfConn.WriteJSON(core.StartMsg{Start: 1, Color: 1, GameId: "gameId"})
+        go playGame(game.P1)
+    } else {
+        game.P2.DisConn = false
+        game.P2.SelfConn = c
+        game.P1.OpConn = c
+        
+        game.P2.SelfConn.WriteJSON(core.StartMsg{Start: 1, Color: 0, GameId: "gameId"})
+        go playGame(game.P2)
+    }
+
+    log.Println("Player reconnected", username)
+    return true
+}
+
+func getUsername(ctx *gin.Context) string {
+    usernameInterface, exists := ctx.Get("username")
+    if !exists {
+        ctx.JSON(400, gin.H{"error": "User claims not found"})
+        ctx.Abort()
+        return ""
+    }
+
+    username, ok := usernameInterface.(string)
+    if !ok {
+        ctx.JSON(400, gin.H{"error": "Username is not a valid string"})
+        ctx.Abort()
+        return ""
+    }
+
+    return username
 }
 
 func ConnectPlayer(ctx *gin.Context) {
     w, r := ctx.Writer, ctx.Request
+    gameType := ctx.Query("type")
+    username := getUsername(ctx)
+    if len(username) == 0 {
+        return
+    }
+    
     c, err := upgrader.Upgrade(w, r, nil)
     if err != nil {
         log.Println("ConnectPlayer:", err)
         return
     }
 
+    if gameType == "reconnect" {
+        if ok := reconnect(username, c); !ok {
+            ctx.JSON(400, gin.H{"error": "Could not reconnect"})
+        }
+        return
+    }
+
     if pendingWS == nil {
         pendingWS = c
+        pendingUN = username
         if err := c.WriteMessage(websocket.TextMessage, []byte("pending"));
         err != nil {
             log.Println("Error sending pending msg:", err)
@@ -240,8 +322,11 @@ func ConnectPlayer(ctx *gin.Context) {
         game.P2.Game = game
         
         game.P1.SelfConn = pendingWS
+        game.P1.Username = pendingUN
         game.P2.SelfConn = c
+        game.P2.Username = username
         pendingWS = nil
+        pendingUN = ""
         startGame(game)
     }
 }

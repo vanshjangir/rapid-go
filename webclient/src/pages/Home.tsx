@@ -12,7 +12,8 @@ const Home = () => {
 
   const findMatch = () => {
     console.log("Token", token);
-    const socket = connect("ws://localhost:8080/game", ["Authorization", token]);
+    const socket = connect("ws://localhost:8080/game?type=new", ["Authorization", token]);
+
     socket.onmessage = async (event: MessageEvent) => {
       if (event.data === "pending") {
         setMatchStatus("pending");
@@ -26,6 +27,23 @@ const Home = () => {
         if (!currentPath.includes(`/game/${json.gameId}`)) {
           nav(`/game/${json.gameId}`);
         }
+      }
+    };
+  };
+
+  const reconnect = () => {
+    console.log("Token", token);
+    const socket = connect("ws://localhost:8080/game?type=reconnect", ["Authorization", token]);
+
+    socket.onmessage = async (event: MessageEvent) => {
+      const json: MsgStart = await JSON.parse(event.data);
+      player.color = json.color;
+      player.gameId = json.gameId;
+      console.log(json);
+
+      const currentPath = window.location.pathname;
+      if (!currentPath.includes(`/game/${json.gameId}`)) {
+        nav(`/game/${json.gameId}`);
       }
     };
   };
@@ -44,6 +62,12 @@ const Home = () => {
           className="px-6 py-3 bg-blue-600 rounded hover:bg-blue-500 focus:outline-none focus:ring focus:ring-blue-300"
         >
           Find Match
+        </button>
+        <button
+          onClick={reconnect}
+          className="px-6 py-3 bg-blue-600 rounded hover:bg-blue-500 focus:outline-none focus:ring focus:ring-blue-300"
+        >
+          Reconnect
         </button>
       </div>
     </div>

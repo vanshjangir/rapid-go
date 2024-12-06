@@ -28,8 +28,8 @@ func createToken(username string) (string, error) {
     var secretKey = []byte(os.Getenv("JWT_SECRET_KEY"))
 
     claims := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-        "sub": username,
-        "exp": time.Now().Add(time.Hour).Unix(),
+        "username": username,
+        "exp": time.Now().Add(24*time.Hour).Unix(),
         "iat": time.Now().Unix(),
     })
     
@@ -65,7 +65,7 @@ func loginByEmail(ctx *gin.Context, req *loginData) {
         return
     }
 
-    token, err := createToken(req.Email)
+    token, err := createToken(username)
     if err != nil {
         ctx.JSON(500, gin.H{"error": "Error generating token"})
         return

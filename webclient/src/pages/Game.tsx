@@ -162,6 +162,7 @@ const Game: React.FC = () => {
   };
 
   const getGameState = async () => {
+    console.log("called");
     const socket = socketRef.current;
     if (!socket) {
       return
