@@ -48,7 +48,9 @@ export interface MsgSync {
   state: number[][];
   liberty: number[][];
   turn: boolean;
-  history: string;
+  history: string[];
+  selfTime: number;
+  opTime: number;
 }
 
 export interface GameState {
@@ -57,5 +59,5 @@ export interface GameState {
   state: number[][];
   liberty: number[][];
   turn: boolean;
-  history: string;
+  history: string[];
 }

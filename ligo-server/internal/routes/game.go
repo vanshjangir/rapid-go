@@ -59,23 +59,14 @@ func handleMove(p *core.Player, msgBytes []byte, ) error {
 
     p.Game.UpdateState(moveMsg.Move, p.Color)
 
-    if p.Color == 1 {
-        p.Game.Turn = 0
-    } else {
-        p.Game.Turn = 1
-    }
-
     p.Game.TapClock(p.Color)
+    p.Game.Turn = 1 - p.Color
 
     moveStatus.MoveStatus = true
     moveStatus.TurnStatus = true
     moveStatus.Move = moveMsg.Move
     moveStatus.SelfTime = p.Game.GetTime(p.Color)
-    if p.Color == 1 {
-        moveStatus.OpTime = p.Game.GetTime(0)
-    } else {
-        moveStatus.OpTime = p.Game.GetTime(1)
-    }
+    moveStatus.OpTime = p.Game.GetTime(1 - p.Color)
 
     if err := p.SelfConn.WriteJSON(moveStatus); err != nil {
         return fmt.Errorf("Error sending move msg: %v", err)
@@ -134,7 +125,9 @@ func handleSyncState(p *core.Player) {
     }
     syncMsg.State = p.Game.State
     syncMsg.Liberty = p.Game.Liberty
-    syncMsg.History = string(p.Game.History)
+    syncMsg.History = p.Game.History
+    syncMsg.SelfTime = p.Game.GetTime(p.Color)
+    syncMsg.OpTime = p.Game.GetTime(1 - p.Color)
 
     if err := p.SelfConn.WriteJSON(syncMsg); err != nil {
         log.Println("Error sending sync msg:", err)
@@ -243,7 +236,7 @@ func startGame(game *core.Game) {
 
 func reconnect(username string, c *websocket.Conn) bool {
     game, ok := Pmap[username]
-    if !ok {
+    if !ok || game == nil {
         return false
     }
 

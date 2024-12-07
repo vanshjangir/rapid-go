@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useGlobalContext } from "../GlobalContext";
 import { MsgLose, MsgMove, MsgMoveStatus, MsgSync, MsgWin } from "../types/game";
 import { GameState } from "../types/game";
 import Navbar from "../components/Navbar";
 
-const BLACK_CELL = 0;
-const WHITE_CELL = 1;
+const WHITE_CELL = 0;
+const BLACK_CELL = 1;
 const EMPTY_CELL = 2;
 
 const Game: React.FC = () => {
@@ -14,25 +14,23 @@ const Game: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const socketRef = useRef<WebSocket | null>(getSocket());
   const intervalRef = useRef<number | null>(null);
+  const playerClock = useRef<HTMLDivElement>(null);
+  const opponentClock = useRef<HTMLDivElement>(null);
+  const gameStateRef = useRef<GameState | null>(null);
 
-  let gridSize = 570;
-  let cellSize = gridSize / 19;
-
-  const [gameState, setGameState] = useState<GameState | null>({
+  gameStateRef.current = {
     gameId: player.gameId,
     color: player.color,
     state: Array.from({ length: 19 }, () => Array(19).fill(EMPTY_CELL)),
     liberty: Array.from({ length: 19 }, () => Array(19).fill(4)),
     turn: player.color === 1 ? true : false,
-    history: ""
-  });
+    history: []
+  };
 
+  let gridSize = 570;
+  let cellSize = gridSize / 19;
   let playerTime = 900;
   let opponentTime = 900;
-
-  const playerClock = useRef<HTMLDivElement>(null);
-  const opponentClock = useRef<HTMLDivElement>(null);
-  const gameStateRef = useRef<GameState | null>(null);
 
   const drawBoard = async () => {
     const canvas = canvasRef.current;
@@ -154,10 +152,10 @@ const Game: React.FC = () => {
   const updateState = (move: string, color: number) => {
     const col = move.charCodeAt(0) - 97;
     const row = parseInt(move.slice(1));
-    if (gameState) {
-      gameState.state[col][row] = color;
-      gameState.turn = (gameState.turn === true ? false : true);
-      console.log("GameState", gameState)
+    if (gameStateRef.current) {
+      gameStateRef.current.state[col][row] = color;
+      gameStateRef.current.turn = (gameStateRef.current.turn === true ? false : true);
+      console.log("GameState", gameStateRef.current)
     }
   };
 
@@ -209,9 +207,9 @@ const Game: React.FC = () => {
         if (!msg.moveStatus) {
           // invalid move
         } else {
-          if (gameState) {
-            updateState(msg.move, gameState.color);
-            placeStone(msg.move, gameState.color);
+          if (gameStateRef.current) {
+            updateState(msg.move, gameStateRef.current.color);
+            placeStone(msg.move, gameStateRef.current.color);
             playerTime = 900 - Math.round(msg.selfTime/1000);
             opponentTime = 900 - Math.round(msg.opTime/1000);
           }
@@ -219,14 +217,14 @@ const Game: React.FC = () => {
         break;
 
       case "move":
-        if (gameState) {
+        if (gameStateRef.current) {
           updateState(
             msg.move,
-            gameState.color === WHITE_CELL ? BLACK_CELL : WHITE_CELL
+            gameStateRef.current.color === WHITE_CELL ? BLACK_CELL : WHITE_CELL
           );
           placeStone(
             msg.move,
-            gameState.color === WHITE_CELL ? BLACK_CELL : WHITE_CELL
+            gameStateRef.current.color === WHITE_CELL ? BLACK_CELL : WHITE_CELL
           );
           playerTime = 900 - Math.round(msg.selfTime/1000);
           opponentTime = 900 - Math.round(msg.opTime/1000);
@@ -234,16 +232,19 @@ const Game: React.FC = () => {
         break;
 
       case "sync":
-        if (gameState) {
+        if (gameStateRef.current) {
+          const gameState = gameStateRef.current
           console.log("Sycn State", msg);
-          setGameState({
-            gameId: msg.gameId,
-            color: msg.color,
-            turn: msg.turn,
-            state: msg.state,
-            liberty: msg.liberty,
-            history: gameState.history + msg.history,
-          });
+          gameState.gameId = msg.gameId,
+          gameState.color = msg.color,
+          gameState.turn = msg.turn,
+          gameState.state = msg.state,
+          gameState.liberty = msg.liberty,
+          gameState.history = msg.history,
+          playerTime = 900 - Math.round(msg.selfTime/1000);
+          opponentTime = 900 - Math.round(msg.opTime/1000);
+          handleResize();
+          setupClock();
         }
         break;
 
@@ -294,17 +295,21 @@ const Game: React.FC = () => {
     }
     drawBoard();
 
-    if(gameState){
+    if(gameStateRef.current){
       for (let i = 0; i < 19; i++) {
         for (let j = 0; j < 19; j++) {
-          if (gameState.state[i][j] !== EMPTY_CELL) {
-            placeStone(`${String.fromCharCode(i + 97)}${j + 1}`, gameState.state[i][j]);
+          if (gameStateRef.current.state[i][j] !== EMPTY_CELL) {
+            placeStone(`${String.fromCharCode(i + 97)}${j + 1}`, gameStateRef.current.state[i][j]);
           }
         }
       }
     }
   };
 
+  useEffect(() => {
+    handleResize();
+    setupClock();
+  }, [gameStateRef.current]);
 
   useEffect(() => {
     intervalRef.current = window.setInterval(() => {
@@ -314,11 +319,10 @@ const Game: React.FC = () => {
 
       if (gameStateRef.current.turn === true) {
         playerTime -= 1;
-        updateClock();
       } else {
         opponentTime -= 1;
-        updateClock();
       }
+      updateClock();
     }, 1000);
 
     return () => {
@@ -359,7 +363,6 @@ const Game: React.FC = () => {
     setupBoard();
     getGameState();
     setupClock();
-    gameStateRef.current = gameState;
 
     window.addEventListener("resize", handleResize);
     handleResize();

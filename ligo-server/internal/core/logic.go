@@ -8,8 +8,8 @@ import (
 )
 
 const (
-    BLACK_CELL = 0
-    WHITE_CELL = 1
+    WHITE_CELL = 0
+    BLACK_CELL = 1
     EMPTY_CELL = 2
     WHITE_CAPTURED = 3
     BLACK_CAPTURED = 4
@@ -22,7 +22,7 @@ type Game struct {
     State       [19][19]int
     Liberty     [19][19]int
     Turn        int
-    History     []byte
+    History     []string
     Over        chan bool
 }
 
@@ -90,13 +90,15 @@ type ReqStateMsg struct {
 }
 
 type SyncMsg struct {
-    Type    string          `json:"type"`
-    GameId  string          `json:"gameId"`
-    Color   int             `json:"color"`
-    Turn    bool            `json:"turn"`
-    Liberty [19][19]int     `json:"liberty"`
-    State   [19][19]int     `json:"state"`
-    History string          `json:"history"`
+    Type        string          `json:"type"`
+    GameId      string          `json:"gameId"`
+    Color       int             `json:"color"`
+    Turn        bool            `json:"turn"`
+    Liberty     [19][19]int     `json:"liberty"`
+    State       [19][19]int     `json:"state"`
+    History     []string        `json:"history"`
+    SelfTime    int64           `json:"selfTime"`
+    OpTime      int64           `json:"opTime"`
 }
 
 type ChatMsg struct {
@@ -105,15 +107,18 @@ type ChatMsg struct {
 }
 
 func (g *Game) InitGame() {
-    g.P1.Color = 1
-    g.P2.Color = 0
+    g.Turn = BLACK_CELL
+    
+    g.P1.Color = BLACK_CELL
     g.P1.OpConn = g.P2.SelfConn
+    g.P1.Clk.Spent = 0
+    
+    g.P2.Color = WHITE_CELL
     g.P2.OpConn = g.P1.SelfConn
-    g.Turn = 1
+    g.P2.Clk.Spent = 0
+    
     g.P1.Clk.Start = time.Now()
-    g.P1.Clk.Spent = 0
-    g.P1.Clk.Spent = 0
-
+    
     for i := 0; i < 19; i++ {
         for j := 0; j < 19; j++ {
             g.State[i][j] = EMPTY_CELL
@@ -123,7 +128,7 @@ func (g *Game) InitGame() {
 
 func (p *Player) CheckDisConnTime() bool {
     diff := time.Now().Sub(p.DisConnTime.Start).Seconds()
-    if diff >= 5 {
+    if diff >= 15 {
         return true
     } else {
         return false
@@ -132,15 +137,17 @@ func (p *Player) CheckDisConnTime() bool {
 
 func (g *Game) CheckTimeout() bool {
     if g.Turn == g.P1.Color {
-        diff := time.Now().Sub(g.P1.Clk.Start).Milliseconds()
-        if diff > 900000 {
+        g.P1.Clk.Spent += time.Now().Sub(g.P1.Clk.Start).Milliseconds()
+        g.P1.Clk.Start = time.Now()
+        if g.P1.Clk.Spent > 900000 {
             return true
         } else {
             return false
         }
     } else {
-        diff := time.Now().Sub(g.P1.Clk.Start).Milliseconds()
-        if diff > 900000 {
+        g.P2.Clk.Spent += time.Now().Sub(g.P2.Clk.Start).Milliseconds()
+        g.P2.Clk.Start = time.Now()
+        if g.P2.Clk.Spent > 900000 {
             return true
         } else {
             return false
@@ -151,9 +158,9 @@ func (g *Game) CheckTimeout() bool {
 func (g *Game) TapClock(color int) {
     if color == g.P1.Color {
         g.P1.Clk.Spent += time.Now().Sub(g.P1.Clk.Start).Milliseconds()
-        g.P1.Clk.Start = time.Now()
+        g.P2.Clk.Start = time.Now()
     } else {
-        g.P1.Clk.Spent += time.Now().Sub(g.P1.Clk.Start).Milliseconds()
+        g.P2.Clk.Spent += time.Now().Sub(g.P2.Clk.Start).Milliseconds()
         g.P1.Clk.Start = time.Now()
     }
 }
@@ -162,7 +169,7 @@ func (g *Game) GetTime(color int) int64 {
     if color == g.P1.Color {
         return g.P1.Clk.Spent
     } else {
-        return g.P1.Clk.Spent
+        return g.P2.Clk.Spent
     }
 }
 
@@ -196,10 +203,7 @@ func (g *Game) CheckValidMove(move string, color int) bool {
 }
 
 func (g *Game) checkInOutCapture(col int, row int, color int) bool {
-    opColor := 0
-    if color == 0 {
-        opColor = 1
-    }
+    opColor := 1 - color
 
     x := [4]int{0, -1, 0, 1}
     y := [4]int{-1, 0, 1, 0}
@@ -299,12 +303,8 @@ func (g *Game) updateLiberties(col int, row int, color int) {
 }
 
 func (g *Game) UpdateState(move string, color int) {
-    if len(g.History) == 0 {
-        g.P1.Clk.Start = time.Now()
-    }
-
     if move == "ps" {
-        g.History = append(g.History, []byte(move)...)
+        g.History = append(g.History, move)
         return
     }
 
@@ -315,7 +315,7 @@ func (g *Game) UpdateState(move string, color int) {
     }
     row -= 1
 
-    if(color == 1){
+    if(color == BLACK_CELL){
         g.State[col][row] = BLACK_CELL
     } else {
         g.State[col][row] = WHITE_CELL
@@ -334,7 +334,7 @@ func (g *Game) UpdateState(move string, color int) {
     }
     g.checkCapture(col, row, color)
 
-    g.History = append(g.History, []byte(move)...)
+    g.History = append(g.History, move)
 }
 
 func (g *Game) checkCapture(col int, row int, color int) {
@@ -364,8 +364,8 @@ func (g *Game) IsOver() (bool, int) {
         return over, -1
     }
 
-    last := string(g.History[total-2:])
-    slast := string(g.History[total-4:total-2])
+    last := string(g.History[total-1])
+    slast := string(g.History[total-2])
 
     if last == "ps" && slast == "ps" {
         over = true
