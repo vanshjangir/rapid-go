@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useGlobalContext } from "../GlobalContext";
-import { MsgLose, MsgMove, MsgMoveStatus, MsgSync, MsgWin } from "../types/game";
+import { ChatMessage, MsgChat, MsgLose, MsgMove, MsgMoveStatus, MsgSync, MsgWin } from "../types/game";
 import { GameState } from "../types/game";
 import Navbar from "../components/Navbar";
 
@@ -9,14 +9,19 @@ const BLACK_CELL = 1;
 const EMPTY_CELL = 2;
 
 const Game: React.FC = () => {
-  const { getSocket, player } = useGlobalContext();
+  const { getSocket, destSocket, player } = useGlobalContext();
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const socketRef = useRef<WebSocket | null>(getSocket());
   const intervalRef = useRef<number | null>(null);
-  const playerClock = useRef<HTMLDivElement>(null);
-  const opponentClock = useRef<HTMLDivElement>(null);
+  const playerClockRef = useRef<HTMLDivElement>(null);
+  const opponentClockRef = useRef<HTMLDivElement>(null);
   const gameStateRef = useRef<GameState | null>(null);
+  const historyDivRef = useRef<HTMLDivElement>(null);
+  const msgRef = useRef<HTMLDivElement>(null);
+  const chatRef = useRef<HTMLDivElement>(null);
+  const messages = useRef<ChatMessage[]>([]);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   gameStateRef.current = {
     gameId: player.gameId,
@@ -27,10 +32,11 @@ const Game: React.FC = () => {
     history: []
   };
 
-  let gridSize = 570;
+  let gridSize = 684;
   let cellSize = gridSize / 19;
   let playerTime = 900;
   let opponentTime = 900;
+  let newMessage = "";
 
   const drawBoard = async () => {
     const canvas = canvasRef.current;
@@ -153,14 +159,19 @@ const Game: React.FC = () => {
     const col = move.charCodeAt(0) - 97;
     const row = parseInt(move.slice(1));
     if (gameStateRef.current) {
-      gameStateRef.current.state[col][row] = color;
-      gameStateRef.current.turn = (gameStateRef.current.turn === true ? false : true);
+      const gameState = gameStateRef.current;
+      if (!gameState.history) gameState.history = [];
+
+      gameState.state[col][row] = color;
+      gameState.turn = !gameState.turn;
+      gameState.history.push(move);
+      updateHistory(gameState.history);
+      showMoveStatus(move);
       console.log("GameState", gameStateRef.current)
     }
   };
 
   const getGameState = async () => {
-    console.log("called");
     const socket = socketRef.current;
     if (!socket) {
       return
@@ -197,22 +208,23 @@ const Game: React.FC = () => {
   };
 
   const handleSocketRecv = async (data: any) => {
-    const msg: MsgMove | MsgMoveStatus | MsgSync | MsgWin | MsgLose = await JSON.parse(data);
+    const msg: MsgMove | MsgMoveStatus | MsgSync | MsgWin | MsgLose | MsgChat =
+      await JSON.parse(data);
     switch (msg.type) {
       case "movestatus":
         if (!msg.turnStatus) {
-          // not your turn
+          showMoveStatus("Not your turn");
           break;
         }
         if (!msg.moveStatus) {
-          // invalid move
-        } else {
-          if (gameStateRef.current) {
-            updateState(msg.move, gameStateRef.current.color);
-            placeStone(msg.move, gameStateRef.current.color);
-            playerTime = 900 - Math.round(msg.selfTime/1000);
-            opponentTime = 900 - Math.round(msg.opTime/1000);
-          }
+          showMoveStatus("Invalid move");
+          break;
+        }
+        if (gameStateRef.current) {
+          updateState(msg.move, gameStateRef.current.color);
+          placeStone(msg.move, gameStateRef.current.color);
+          playerTime = 900 - Math.round(msg.selfTime/1000);
+          opponentTime = 900 - Math.round(msg.opTime/1000);
         }
         break;
 
@@ -245,6 +257,7 @@ const Game: React.FC = () => {
           opponentTime = 900 - Math.round(msg.opTime/1000);
           handleResize();
           setupClock();
+          updateHistory(gameState.history);
         }
         break;
 
@@ -252,6 +265,8 @@ const Game: React.FC = () => {
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
         }
+        showEndMessage("You Won", true)
+        destSocket();
         console.log("You Won!!")
         break;
       
@@ -259,7 +274,14 @@ const Game: React.FC = () => {
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
         }
+        showEndMessage("You Lost", false)
+        destSocket();
         console.log("You Lost :(")
+        break;
+
+      case "chat":
+        messages.current = [...messages.current, {type: 'received', text: msg.message.trim() }];
+        updateChat();
         break;
     }
   };
@@ -283,7 +305,7 @@ const Game: React.FC = () => {
 
   const handleResize = () => {
     const width = window.innerWidth * 0.7 > 600 ? window.innerWidth * 0.7 : window.innerWidth * 0.9;
-    const newGridSize = (Math.floor((Math.floor(Math.min(width, 570)))/19))*19;
+    const newGridSize = (Math.floor((Math.floor(Math.min(width, 684)))/19))*19;
     const newCellSize = newGridSize / 19;
     gridSize = newGridSize;
     cellSize = newCellSize;
@@ -306,32 +328,6 @@ const Game: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    handleResize();
-    setupClock();
-  }, [gameStateRef.current]);
-
-  useEffect(() => {
-    intervalRef.current = window.setInterval(() => {
-      if (!gameStateRef.current) {
-        return;
-      }
-
-      if (gameStateRef.current.turn === true) {
-        playerTime -= 1;
-      } else {
-        opponentTime -= 1;
-      }
-      updateClock();
-    }, 1000);
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, []);
-
   const formatTime = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60)
       .toString()
@@ -341,22 +337,124 @@ const Game: React.FC = () => {
   };
 
   const updateClock = () => {
-    if (!playerClock.current || !opponentClock.current || !gameStateRef.current) {
+    if (!playerClockRef.current || !opponentClockRef.current || !gameStateRef.current) {
       return
     }
     if (gameStateRef.current.turn === true) {
-      playerClock.current.textContent = formatTime(playerTime);
+      playerClockRef.current.textContent = formatTime(playerTime);
     } else {
-      opponentClock.current.textContent = formatTime(opponentTime);
+      opponentClockRef.current.textContent = formatTime(opponentTime);
     }
   };
 
   const setupClock = () => {
-    if (playerClock.current && opponentClock.current) {
-      playerClock.current.textContent = formatTime(playerTime)
-      opponentClock.current.textContent = formatTime(opponentTime);
+    if (playerClockRef.current && opponentClockRef.current) {
+      playerClockRef.current.textContent = formatTime(playerTime)
+      opponentClockRef.current.textContent = formatTime(opponentTime);
     }
   }
+
+  const showMoveStatus = (msg: string) => {
+    if (msgRef.current) {
+      msgRef.current.className = "text-center text-xl font-bold h-[40px]";
+      msgRef.current.innerText = msg;
+    }
+  }
+
+  const showEndMessage = (msg: string, win: boolean) => {
+    if (msgRef.current) {
+      if (win) {
+        msgRef.current.className = "text-center text-3xl font-bold h-[40px]";
+        msgRef.current.innerText = msg;
+      } else {
+        msgRef.current.className = "text-center text-3xl font-bold h-[40px]";
+        msgRef.current.innerText = msg;
+      }
+    }
+  }
+
+  const updateHistory = (history: string[]) => {
+    if (historyDivRef.current) {
+      historyDivRef.current.innerHTML = "";
+      history.forEach((_, index) => {
+        if (index % 2 === 0) {
+          const rowDiv = document.createElement("div");
+          rowDiv.className = "text-white flex flex-row w-full";
+
+          const firstMove = document.createElement("div");
+          firstMove.className = "bg-[#282828] w-[50%] text-center";
+          firstMove.textContent = history[index] || "";
+
+          const secondMove = document.createElement("div");
+          secondMove.className = "bg-[#343434] w-[50%] text-center";
+          secondMove.textContent = history[index + 1] || "";
+
+          rowDiv.appendChild(firstMove);
+          rowDiv.appendChild(secondMove);
+
+          if (historyDivRef.current)
+            historyDivRef.current.appendChild(rowDiv);
+        }
+      });
+    }
+  };
+  
+  const updateChat = () => {
+    if (chatRef.current) {
+      chatRef.current.innerHTML = "";
+      messages.current.forEach((_, index) => {
+        const textDiv = document.createElement("div");
+        textDiv.className = "text-white flex flex-row w-full";
+        textDiv.textContent = messages.current[index].text;
+        textDiv.className = `px-2 rounded-lg text-wrap break-all ${messages.current[index].type === 'sent' ? 'text-blue-500 self-end' : 'text-gray-500 self-start'}`;
+
+
+        if (chatRef.current) {
+          chatRef.current.appendChild(textDiv);
+          chatRef.current.scrollTop = chatRef.current.scrollHeight;
+        }
+      });
+    }
+  };
+
+  const handleSendMessage = () => {
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
+    if (newMessage.trim()) {
+      messages.current = [...messages.current, { type: 'sent', text: newMessage.trim() }];
+      const socket = socketRef.current;
+      if (socket) {
+        socket.send(
+          JSON.stringify({
+            type: "chat",
+            message: newMessage.trim()
+          })
+        );
+      }
+      newMessage = "";
+      updateChat();
+    }
+  };
+
+  useEffect(() => {
+    handleResize();
+    setupClock();
+  }, [gameStateRef.current]);
+
+  useEffect(() => {
+    intervalRef.current = window.setInterval(() => {
+      if (!gameStateRef.current) return;
+      gameStateRef.current.turn === true ? playerTime -= 1 : opponentTime -= 1;
+      updateClock();
+    }, 1000);
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     setupSocket();
@@ -373,10 +471,10 @@ const Game: React.FC = () => {
   }, []);
 
   return (
-    <div className="h-screen flex flex-col bg-[#222222]">
+    <div className="h-screen flex flex-col bg-[#222222] overflow-y-auto">
       <Navbar />
-      <div id="game-container" className="w-full flex flex-col lg:flex-row">
-        <div id="game-board" className="w-full lg:w-[70vw] flex justify-center">
+      <div id="game-container" className="w-full flex flex-col items-center justify-center lg:flex-row">
+        <div id="game-board" className="flex flex-col items-center">
           <canvas
             ref={canvasRef}
             id="canvas"
@@ -384,20 +482,59 @@ const Game: React.FC = () => {
             width={gridSize + cellSize}
             height={gridSize + cellSize}
           ></canvas>
-        </div>
-        <div id="game-stats" className="flex flex-col text-white w-full lg:w-auto">
-          <div className="flex flex-row justify-between items-center mb-4">
-            <div className="flex-1 text-center">
+          <div className="flex text-white w-full justify-between">
+            <div className="text-center">
               <span className="text-xl font-bold">Opponent</span>
-              <div className="text-lg" ref={opponentClock}></div>
+              <div className="text-lg" ref={opponentClockRef}></div>
             </div>
-            <div className="flex-1 text-center">
+            <div className="text-center">
               <span className="text-xl font-bold">Player</span>
-              <div className="text-lg" ref={playerClock}></div>
+              <div className="text-lg" ref={playerClockRef}></div>
             </div>
           </div>
-          <button onClick={handlePass}>Pass</button>
-          <button onClick={handleAbort}>Abort</button>
+        </div>
+        <div id="game-stats" className="flex flex-col ml-2 text-white">
+          <div ref={msgRef} className="text-center text-3xl font-bold h-[40px]"></div>
+          <div className="flex flex-row justify-center w-[400px] p-2">
+            <button
+              onClick={handlePass}
+              className="bg-blue-500 rounded-l-lg p-2 w-[150px]"
+            >Pass</button>
+            <button
+              onClick={handleAbort}
+              className="bg-red-500 rounded-r-lg p-2 w-[150px]"
+            >Abort</button>
+          </div>
+          <div className="flex flex-col text-white h-[250px] w-[400px] items-center">
+            <div
+              ref={historyDivRef}
+              className="flex flex-col overflow-y-auto h-full w-full bg-[#181818] rounded"
+              style={{ maxHeight: "250px" }}
+            ></div>
+          </div>
+          <div className="flex flex-col text-white h-[300px] w-[400px] items-center">
+            <div className="mb-2">Chat</div>
+            <div
+              ref={chatRef}
+              className="flex flex-col overflow-y-auto h-[250px] w-full bg-[#181818] rounded"
+              style={{ maxHeight: "250px", padding: "10px" }}
+            >
+            </div>
+            <div className="flex w-full mt-2">
+              <input
+                type="text"
+                ref={inputRef}
+                onChange={(e) => newMessage = e.target.value}
+                onKeyDown={(e) => { if (e.key === "Enter") handleSendMessage()}}
+                className="flex-1 p-2 bg-[#282828] text-white rounded-l-lg outline-none"
+                placeholder="Type your message..."
+              />
+              <button
+                onClick={handleSendMessage}
+                className="p-2 bg-blue-500 text-white rounded-r-lg"
+              >Send</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

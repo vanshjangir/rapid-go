@@ -5,6 +5,7 @@ import (
     "time"
 
     "github.com/gorilla/websocket"
+    "github.com/google/uuid"
 )
 
 const (
@@ -16,8 +17,8 @@ const (
 )
 
 type Game struct {
-    P1          *Player
-    P2          *Player
+    Pblack      *Player
+    Pwhite      *Player
     Id          string
     State       [19][19]int
     Liberty     [19][19]int
@@ -102,28 +103,37 @@ type SyncMsg struct {
 }
 
 type ChatMsg struct {
-    Type    string  `json:"string"`
+    Type    string  `json:"type"`
     Message string  `json:"message"`
 }
 
 func (g *Game) InitGame() {
     g.Turn = BLACK_CELL
     
-    g.P1.Color = BLACK_CELL
-    g.P1.OpConn = g.P2.SelfConn
-    g.P1.Clk.Spent = 0
+    g.Pblack.Color = BLACK_CELL
+    g.Pblack.OpConn = g.Pwhite.SelfConn
+    g.Pblack.Clk.Spent = 0
     
-    g.P2.Color = WHITE_CELL
-    g.P2.OpConn = g.P1.SelfConn
-    g.P2.Clk.Spent = 0
+    g.Pwhite.Color = WHITE_CELL
+    g.Pwhite.OpConn = g.Pblack.SelfConn
+    g.Pwhite.Clk.Spent = 0
     
-    g.P1.Clk.Start = time.Now()
+    g.Pblack.Clk.Start = time.Now()
     
     for i := 0; i < 19; i++ {
         for j := 0; j < 19; j++ {
             g.State[i][j] = EMPTY_CELL
         }
     }
+    
+    g.Id = getUniqueId()
+}
+
+func getUniqueId() string {
+    currentTimestamp := int(time.Now().UnixNano()) / int(time.Microsecond)
+    uniqueID := uuid.New().ID()
+    ID := currentTimestamp + int(uniqueID)
+    return strconv.Itoa(ID)
 }
 
 func (p *Player) CheckDisConnTime() bool {
@@ -136,18 +146,18 @@ func (p *Player) CheckDisConnTime() bool {
 }
 
 func (g *Game) CheckTimeout() bool {
-    if g.Turn == g.P1.Color {
-        g.P1.Clk.Spent += time.Now().Sub(g.P1.Clk.Start).Milliseconds()
-        g.P1.Clk.Start = time.Now()
-        if g.P1.Clk.Spent > 900000 {
+    if g.Turn == g.Pblack.Color {
+        g.Pblack.Clk.Spent += time.Now().Sub(g.Pblack.Clk.Start).Milliseconds()
+        g.Pblack.Clk.Start = time.Now()
+        if g.Pblack.Clk.Spent > 900000 {
             return true
         } else {
             return false
         }
     } else {
-        g.P2.Clk.Spent += time.Now().Sub(g.P2.Clk.Start).Milliseconds()
-        g.P2.Clk.Start = time.Now()
-        if g.P2.Clk.Spent > 900000 {
+        g.Pwhite.Clk.Spent += time.Now().Sub(g.Pwhite.Clk.Start).Milliseconds()
+        g.Pwhite.Clk.Start = time.Now()
+        if g.Pwhite.Clk.Spent > 900000 {
             return true
         } else {
             return false
@@ -156,20 +166,20 @@ func (g *Game) CheckTimeout() bool {
 }
 
 func (g *Game) TapClock(color int) {
-    if color == g.P1.Color {
-        g.P1.Clk.Spent += time.Now().Sub(g.P1.Clk.Start).Milliseconds()
-        g.P2.Clk.Start = time.Now()
+    if color == g.Pblack.Color {
+        g.Pblack.Clk.Spent += time.Now().Sub(g.Pblack.Clk.Start).Milliseconds()
+        g.Pwhite.Clk.Start = time.Now()
     } else {
-        g.P2.Clk.Spent += time.Now().Sub(g.P2.Clk.Start).Milliseconds()
-        g.P1.Clk.Start = time.Now()
+        g.Pwhite.Clk.Spent += time.Now().Sub(g.Pwhite.Clk.Start).Milliseconds()
+        g.Pblack.Clk.Start = time.Now()
     }
 }
 
 func (g *Game) GetTime(color int) int64 {
-    if color == g.P1.Color {
-        return g.P1.Clk.Spent
+    if color == g.Pblack.Color {
+        return g.Pblack.Clk.Spent
     } else {
-        return g.P2.Clk.Spent
+        return g.Pwhite.Clk.Spent
     }
 }
 

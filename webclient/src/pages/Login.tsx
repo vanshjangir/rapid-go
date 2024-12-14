@@ -29,6 +29,7 @@ const Login: React.FC = () => {
       console.log("Login successful");
       localStorage.setItem("token", json.token);
       localStorage.setItem("username", json.username);
+      localStorage.setItem('isLoggedIn', 'true');
       setUsername(json.username);
       nav("/");
     } else {

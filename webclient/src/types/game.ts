@@ -53,6 +53,11 @@ export interface MsgSync {
   opTime: number;
 }
 
+export interface MsgChat {
+  type: "chat";
+  message: string;
+}
+
 export interface GameState {
   gameId: string;
   color: number;
@@ -60,4 +65,9 @@ export interface GameState {
   liberty: number[][];
   turn: boolean;
   history: string[];
+}
+
+export interface ChatMessage {
+  type: "sent" | "received";
+  text: string;
 }

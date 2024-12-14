@@ -1,9 +1,15 @@
-import React from "react";
-import { useGlobalContext } from "../GlobalContext";
+import React, { useEffect, useState } from "react";
 
 const Navbar: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
-  const { isLoggedIn, username } = useGlobalContext();
+  const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+  const username = localStorage.getItem('username');
+  const [logged, setLogged] = useState<boolean>(isLoggedIn);
+  console.log("re called")
+
+  useEffect(() => {
+    setLogged(isLoggedIn);
+  }, []);
 
   return (
     <nav className="bg-[#222222] text-white">
@@ -27,10 +33,15 @@ const Navbar: React.FC = () => {
           </div>
           <div className="flex items-center">
             <div className="hidden md:block">
-              {isLoggedIn ? (
-                <span className="px-4 py-2 text-sm text-slate-300">
-                  Welcome, {username}
-                </span>
+              {logged ? (
+                <div>
+                  <span className="px-4 py-2 font-bold text-slate-300">
+                    {username}
+                  </span>
+                  <a href="" onClick={() => { localStorage.clear(); setLogged(false)}} className="px-4 py-2 text-sm bg-slate-600 hover:bg-slate-500 rounded">
+                    Logout
+                  </a>
+                </div>
               ) : (
                 <>
                   <a href="/login" className="px-4 py-2 text-sm bg-slate-600 hover:bg-slate-500 rounded">
@@ -81,10 +92,15 @@ const Navbar: React.FC = () => {
             <a href="/community" className="block px-3 py-2 rounded-md text-base font-medium text-slate-300 hover:text-white hover:bg-gray-700">
               Community
             </a>
-            {isLoggedIn ? (
-              <span className="block px-3 py-2 rounded-md text-base font-medium text-slate-300 hover:text-white">
-                Welcome, {username}
-              </span>
+            {logged ? (
+              <div className="flex flex-col">
+                <span className="px-4 py-2 font-bold text-slate-300">
+                  {username}
+                </span>
+                <a href="" onClick={() => { localStorage.clear(); setLogged(false)}} className="block px-3 py-2 rounded-md text-base font-medium bg-slate-600 hover:bg-slate-500">
+                  Logout
+                </a>
+              </div>
             ) : (
               <>
                 <a href="/login" className="block px-3 py-2 rounded-md text-base font-medium bg-slate-600 hover:bg-slate-500">

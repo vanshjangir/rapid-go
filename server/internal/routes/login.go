@@ -8,7 +8,7 @@ import (
     "database/sql"
 
     "github.com/gin-gonic/gin"
-    "github.com/vanshjangir/ligo/ligo-server/internal/database"
+    "github.com/vanshjangir/ligo/server/internal/database"
     "github.com/golang-jwt/jwt/v5"
 )
 

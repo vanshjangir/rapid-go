@@ -6,9 +6,11 @@ import (
     "time"
     "net/http"
     "encoding/json"
+    "database/sql"
     "github.com/gin-gonic/gin"
     "github.com/gorilla/websocket"
-    "github.com/vanshjangir/ligo/ligo-server/internal/core"
+    "github.com/vanshjangir/ligo/server/internal/core"
+    "github.com/vanshjangir/ligo/server/internal/database"
 )
 
 var Pmap map[string]*core.Game;
@@ -88,11 +90,11 @@ func handleGameOver(g *core.Game, winner int) {
     winMsg.Type = "win"
     loseMsg.Type = "lose"
 
-    wConn  := g.P1.SelfConn
-    lConn  := g.P2.SelfConn
-    if winner == g.P2.Color {
-        wConn = g.P2.SelfConn
-        lConn = g.P1.SelfConn
+    wConn  := g.Pblack.SelfConn
+    lConn  := g.Pwhite.SelfConn
+    if winner == g.Pwhite.Color {
+        wConn = g.Pwhite.SelfConn
+        lConn = g.Pblack.SelfConn
     }
 
     if err := wConn.WriteJSON(winMsg); err != nil {
@@ -111,8 +113,17 @@ func handleGameOver(g *core.Game, winner int) {
         log.Println("Error closing conn loser:", err)
     }
 
-    Pmap[g.P1.Username] = nil
-    Pmap[g.P2.Username] = nil
+    Pmap[g.Pblack.Username] = nil
+    Pmap[g.Pwhite.Username] = nil
+
+    db := database.ConnectDatabase()
+    if err := saveGame(db, g); err != nil {
+        log.Println("Error saving game state");
+    }
+}
+
+func saveGame(db *sql.DB, g *core.Game) error {
+    return nil
 }
 
 func handleSyncState(p *core.Player) {
@@ -132,6 +143,20 @@ func handleSyncState(p *core.Player) {
     if err := p.SelfConn.WriteJSON(syncMsg); err != nil {
         log.Println("Error sending sync msg:", err)
     }
+}
+
+func handleChat(p *core.Player, msgBytes []byte) error {
+    var chatMsg core.ChatMsg
+    
+    if err := json.Unmarshal(msgBytes, &chatMsg); err != nil {
+        return fmt.Errorf("Error unmarshling chat msg: %v", err);
+    }
+
+    if err := p.OpConn.WriteJSON(chatMsg); err != nil {
+        return fmt.Errorf("Error sending chat msg: %v", err)
+    }
+
+    return nil
 }
 
 func handleRecv (p *core.Player) error {
@@ -169,6 +194,7 @@ func handleRecv (p *core.Player) error {
         handleSyncState(p)
 
     case "chat":
+        handleChat(p, msgBytes);
     }
 
     return nil
@@ -195,14 +221,14 @@ func monitorTimeout(g *core.Game) {
         case <- g.Over:
             return
         default:
-            if g.P1.DisConn && g.P1.CheckDisConnTime() {
-                winner := 1 - g.P1.Color
+            if g.Pblack.DisConn && g.Pblack.CheckDisConnTime() {
+                winner := 1 - g.Pblack.Color
                 handleGameOver(g, winner)
                 log.Println("Game over by disconnection")
                 return
             }
-            if g.P2.DisConn && g.P2.CheckDisConnTime() {
-                winner := 1 - g.P2.Color
+            if g.Pwhite.DisConn && g.Pwhite.CheckDisConnTime() {
+                winner := 1 - g.Pwhite.Color
                 handleGameOver(g, winner)
                 log.Println("Game over by disconnection")
                 return
@@ -222,15 +248,15 @@ func startGame(game *core.Game) {
     log.Println("New match has started")
 
     game.InitGame()
-    game.P1.SelfConn.WriteJSON(core.StartMsg{Start: 1, Color: 1, GameId: "gameId"})
-    game.P2.SelfConn.WriteJSON(core.StartMsg{Start: 1, Color: 0, GameId: "gameId"})
+    game.Pblack.SelfConn.WriteJSON(core.StartMsg{Start: 1, Color: 1, GameId: game.Id})
+    game.Pwhite.SelfConn.WriteJSON(core.StartMsg{Start: 1, Color: 0, GameId: game.Id})
     
-    Pmap[game.P1.Username] = game
-    Pmap[game.P2.Username] = game
+    Pmap[game.Pblack.Username] = game
+    Pmap[game.Pwhite.Username] = game
    
     game.Over = make(chan bool)
-    go playGame(game.P1)
-    go playGame(game.P2)
+    go playGame(game.Pblack)
+    go playGame(game.Pwhite)
     go monitorTimeout(game)
 }
 
@@ -240,22 +266,23 @@ func reconnect(username string, c *websocket.Conn) bool {
         return false
     }
 
-    if game.P1.Username == username {
-        game.P1.DisConn = false
-        game.P1.SelfConn = c
-        game.P2.OpConn = c
+    if game.Pblack.Username == username {
+        game.Pblack.DisConn = false
+        game.Pblack.SelfConn = c
+        game.Pwhite.OpConn = c
 
-        game.P1.SelfConn.WriteJSON(core.StartMsg{Start: 1, Color: 1, GameId: "gameId"})
-        go playGame(game.P1)
+        game.Pblack.SelfConn.WriteJSON(core.StartMsg{Start: 1, Color: 1, GameId: "gameId"})
+        go playGame(game.Pblack)
     } else {
-        game.P2.DisConn = false
-        game.P2.SelfConn = c
-        game.P1.OpConn = c
+        game.Pwhite.DisConn = false
+        game.Pwhite.SelfConn = c
+        game.Pblack.OpConn = c
         
-        game.P2.SelfConn.WriteJSON(core.StartMsg{Start: 1, Color: 0, GameId: "gameId"})
-        go playGame(game.P2)
+        game.Pwhite.SelfConn.WriteJSON(core.StartMsg{Start: 1, Color: 0, GameId: "gameId"})
+        go playGame(game.Pwhite)
     }
 
+    c.WriteMessage(websocket.TextMessage, []byte("reconnected"))
     log.Println("Player reconnected", username)
     return true
 }
@@ -294,7 +321,7 @@ func ConnectPlayer(ctx *gin.Context) {
 
     if gameType == "reconnect" {
         if ok := reconnect(username, c); !ok {
-            ctx.JSON(400, gin.H{"error": "Could not reconnect"})
+            c.WriteMessage(websocket.TextMessage, []byte("Error in reconnecting"))
         }
         return
     }
@@ -309,15 +336,15 @@ func ConnectPlayer(ctx *gin.Context) {
         }
     } else {
         game := new(core.Game)
-        game.P1 = new(core.Player)
-        game.P2 = new(core.Player)
-        game.P1.Game = game
-        game.P2.Game = game
+        game.Pblack = new(core.Player)
+        game.Pwhite = new(core.Player)
+        game.Pblack.Game = game
+        game.Pwhite.Game = game
         
-        game.P1.SelfConn = pendingWS
-        game.P1.Username = pendingUN
-        game.P2.SelfConn = c
-        game.P2.Username = username
+        game.Pblack.SelfConn = pendingWS
+        game.Pblack.Username = pendingUN
+        game.Pwhite.SelfConn = c
+        game.Pwhite.Username = username
         pendingWS = nil
         pendingUN = ""
         startGame(game)

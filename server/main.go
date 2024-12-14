@@ -8,10 +8,10 @@ import (
     "github.com/joho/godotenv"
     _ "github.com/lib/pq"
 
-    "github.com/vanshjangir/ligo/ligo-server/internal/core"
-    "github.com/vanshjangir/ligo/ligo-server/internal/routes"
-    "github.com/vanshjangir/ligo/ligo-server/internal/database"
-    "github.com/vanshjangir/ligo/ligo-server/internal/middleware"
+    "github.com/vanshjangir/ligo/server/internal/core"
+    "github.com/vanshjangir/ligo/server/internal/routes"
+    "github.com/vanshjangir/ligo/server/internal/database"
+    "github.com/vanshjangir/ligo/server/internal/middleware"
 )
 
 func main(){

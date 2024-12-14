@@ -20,7 +20,7 @@ func ConnectDatabase () *sql.DB {
         port, _ := strconv.Atoi(os.Getenv("POSTGRES_PORT"))
         user := os.Getenv("POSTGRES_USER")
         password := os.Getenv("POSTGRES_PASSWORD")
-        dbname := "ligo"
+        dbname := "rapid-go"
 
         psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
             "password=%s dbname=%s sslmode=disable",
