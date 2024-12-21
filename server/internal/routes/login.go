@@ -41,8 +41,6 @@ func createToken(username string) (string, error) {
     return tokenString, nil
 }
 
-
-
 func loginByEmail(ctx *gin.Context, req *loginData) {
 
     db := database.ConnectDatabase()

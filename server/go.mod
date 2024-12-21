@@ -12,6 +12,7 @@ require (
 )
 
 require (
+	github.com/acityinohio/baduk v0.0.0-20170329050433-661f1b5d3ad1 // indirect
 	github.com/bytedance/sonic v1.11.6 // indirect
 	github.com/bytedance/sonic/loader v0.1.1 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect

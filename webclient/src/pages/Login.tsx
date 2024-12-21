@@ -9,9 +9,10 @@ const Login: React.FC = () => {
   const [error, setError] = useState("");
   const nav = useNavigate();
   const { setUsername } = useGlobalContext();
+  const httpapi = import.meta.env.VITE_HTTP_URL
 
   const handleLogin = async () => {
-    const response = await fetch('http://localhost:8080/login', {
+    const response = await fetch(httpapi + '/login', {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -45,7 +46,7 @@ const Login: React.FC = () => {
       return
     }
 
-    const response = await fetch('http://localhost:8080/login', {
+    const response = await fetch(httpapi + '/login', {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

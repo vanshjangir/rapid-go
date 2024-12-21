@@ -26,6 +26,7 @@ func main(){
     r.GET("/game", middleware.Auth, routes.ConnectPlayer)
     r.POST("/login", routes.Login)
     r.POST("/signup", routes.Signup)
+    r.GET("/isPending", routes.IsPending)
 
     if err := godotenv.Load(); err != nil {
         log.Fatal("Error loading env variables: ", err);

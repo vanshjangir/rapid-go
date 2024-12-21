@@ -1,1 +1,1 @@
-# Ligo - open source Go server, inspired by [lichess](https://lichess.org).
+# Rapid-go - open source Go server.

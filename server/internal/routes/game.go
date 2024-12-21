@@ -4,6 +4,7 @@ import (
     "fmt"
     "log"
     "time"
+    "strings"
     "net/http"
     "encoding/json"
     "database/sql"
@@ -84,7 +85,7 @@ func handleMove(p *core.Player, msgBytes []byte, ) error {
     return nil
 }
 
-func handleGameOver(g *core.Game, winner int) {
+func handleGameOver(g *core.Game, winner int, wonby string) {
     winMsg := new(core.WinMsg)
     loseMsg := new(core.LoseMsg)
     winMsg.Type = "win"
@@ -113,16 +114,51 @@ func handleGameOver(g *core.Game, winner int) {
         log.Println("Error closing conn loser:", err)
     }
 
-    Pmap[g.Pblack.Username] = nil
-    Pmap[g.Pwhite.Username] = nil
+    delete(Pmap, g.Pblack.Username)
+    delete(Pmap, g.Pwhite.Username)
 
     db := database.ConnectDatabase()
-    if err := saveGame(db, g); err != nil {
-        log.Println("Error saving game state");
+    if err := saveGame(db, g, winner, wonby); err != nil {
+        log.Println("Error saving game state:", err);
+    }
+    
+    if err := updateRating(db, g); err != nil {
+        log.Println("Error saving game state:", err);
     }
 }
 
-func saveGame(db *sql.DB, g *core.Game) error {
+func saveGame(db *sql.DB, g *core.Game, winner int, wonby string) error {
+    insertQuery := "INSERT INTO games (gameid, white, black, winner, wonby, moves) VALUES ($1, $2, $3, $4, $5, $6)"
+    if _, err := db.Exec(
+        insertQuery,
+        g.Id,
+        g.Pwhite.Username,
+        g.Pblack.Username,
+        winner,
+        wonby,
+        strings.Join(g.History, "/"),
+        ); err != nil {
+        return err
+    }
+    return nil
+}
+
+func getNewRating(wr int, br int) (int, int) {
+    return wr, br
+}
+
+func updateRating(db *sql.DB, g *core.Game) error {
+    wnew, bnew := getNewRating(g.Pwhite.Rating, g.Pblack.Rating)
+    query := "UPDATE users SET rating = $1 WHERE username = $2"
+
+    if _, err := db.Exec(query, wnew, g.Pwhite.Username); err != nil {
+        return err
+    }
+
+    if _, err := db.Exec(query, bnew, g.Pblack.Username); err != nil {
+        return err
+    }
+
     return nil
 }
 
@@ -179,14 +215,14 @@ func handleRecv (p *core.Player) error {
         }
 
         if ok, winner := p.Game.IsOver(); ok {
-            handleGameOver(p.Game, winner)
+            handleGameOver(p.Game, winner, "move")
             close(p.Game.Over)
             return fmt.Errorf("Game Over by move")
         }
 
     case "abort":
         winner := 1 - p.Color
-        handleGameOver(p.Game, winner)
+        handleGameOver(p.Game, winner, "abort")
         close(p.Game.Over)
         return fmt.Errorf("Game over by abort")
 
@@ -223,19 +259,19 @@ func monitorTimeout(g *core.Game) {
         default:
             if g.Pblack.DisConn && g.Pblack.CheckDisConnTime() {
                 winner := 1 - g.Pblack.Color
-                handleGameOver(g, winner)
+                handleGameOver(g, winner, "discn")
                 log.Println("Game over by disconnection")
                 return
             }
             if g.Pwhite.DisConn && g.Pwhite.CheckDisConnTime() {
                 winner := 1 - g.Pwhite.Color
-                handleGameOver(g, winner)
+                handleGameOver(g, winner, "discn")
                 log.Println("Game over by disconnection")
                 return
             }
             if g.CheckTimeout() {
                 winner := 1 - g.Turn
-                handleGameOver(g, winner)
+                handleGameOver(g, winner, "time")
                 log.Println("Game over by timeout")
                 return
             }
@@ -244,10 +280,25 @@ func monitorTimeout(g *core.Game) {
     }
 }
 
+func getRating(username string) int {
+    db := database.ConnectDatabase()
+    query := "SELECT rating FROM users WHERE username = $1"
+    
+    var rating int
+    err := db.QueryRow(query, username).Scan(&rating)
+    if err != nil {
+        return 400
+    }
+
+    return rating
+}
+
 func startGame(game *core.Game) {
     log.Println("New match has started")
 
     game.InitGame()
+    game.Pblack.Rating = getRating(game.Pblack.Username)
+    game.Pwhite.Rating = getRating(game.Pwhite.Username)
     game.Pblack.SelfConn.WriteJSON(core.StartMsg{Start: 1, Color: 1, GameId: game.Id})
     game.Pwhite.SelfConn.WriteJSON(core.StartMsg{Start: 1, Color: 0, GameId: game.Id})
     
@@ -271,14 +322,14 @@ func reconnect(username string, c *websocket.Conn) bool {
         game.Pblack.SelfConn = c
         game.Pwhite.OpConn = c
 
-        game.Pblack.SelfConn.WriteJSON(core.StartMsg{Start: 1, Color: 1, GameId: "gameId"})
+        game.Pblack.SelfConn.WriteJSON(core.StartMsg{Start: 1, Color: 1, GameId: game.Id})
         go playGame(game.Pblack)
     } else {
         game.Pwhite.DisConn = false
         game.Pwhite.SelfConn = c
         game.Pblack.OpConn = c
         
-        game.Pwhite.SelfConn.WriteJSON(core.StartMsg{Start: 1, Color: 0, GameId: "gameId"})
+        game.Pwhite.SelfConn.WriteJSON(core.StartMsg{Start: 1, Color: 0, GameId: game.Id})
         go playGame(game.Pwhite)
     }
 

@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const Navbar: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
   const username = localStorage.getItem('username');
   const [logged, setLogged] = useState<boolean>(isLoggedIn);
-  console.log("re called")
+  const nav = useNavigate();
 
   useEffect(() => {
     setLogged(isLoggedIn);
@@ -17,7 +18,7 @@ const Navbar: React.FC = () => {
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <a href="/" className="text-2xl font-bold text-slate-300 hover:text-white">
-              Ligo
+              Rapid-Go
             </a>
             <div className="hidden md:block ml-10 space-x-4">
               <a href="/learn" className="hover:text-slate-400">
@@ -36,7 +37,9 @@ const Navbar: React.FC = () => {
               {logged ? (
                 <div>
                   <span className="px-4 py-2 font-bold text-slate-300">
-                    {username}
+                    <a href="" onClick={() => { nav(`/profile/${username}`)}} className="hover:underline">
+                      {username}
+                    </a>
                   </span>
                   <a href="" onClick={() => { localStorage.clear(); setLogged(false)}} className="px-4 py-2 text-sm bg-slate-600 hover:bg-slate-500 rounded">
                     Logout

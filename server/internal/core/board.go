@@ -33,6 +33,7 @@ type Player struct {
     DisConn     bool
     Clk         Clock
     DisConnTime Clock
+    Rating      int
     Game        *Game
     SelfConn    *websocket.Conn
     OpConn      *websocket.Conn

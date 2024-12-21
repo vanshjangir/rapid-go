@@ -5,14 +5,17 @@ import (
     "fmt"
     "net/http"
     "strings"
+    "strconv"
 
     "github.com/gin-gonic/gin"
     "github.com/golang-jwt/jwt/v5"
+    "github.com/google/uuid"
 )
 
 const (
     TOKEN_TYPE_JWT = "1"
     TOKEN_TYPE_OAUTH = "2"
+    TOKEN_TYPE_GUEST = "3"
 )
 
 func verifyToken(tokenString string) (*jwt.Token, error) {
@@ -68,6 +71,12 @@ func Auth(ctx *gin.Context) {
         ctx.Set("username", claims["username"])
         ctx.Next()
     case TOKEN_TYPE_OAUTH:
+        ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Support will be added soon"})
+        ctx.Abort()
+    case TOKEN_TYPE_GUEST:
+        uniqueId := int(uuid.New().ID())
+        ctx.Set("username", "G"+strconv.Itoa(uniqueId))
+        ctx.Next()
     default:
         fmt.Printf("Unknown token type: %v\n", token[:1])
         ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unsupported token type"})
