@@ -13,11 +13,11 @@ const Navbar: React.FC = () => {
   }, []);
 
   return (
-    <nav className="bg-[#222222] text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <nav className="bg-[#222222] text-white text-xl">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <a href="/" className="text-2xl font-bold text-slate-300 hover:text-white">
+            <a href="/" className="text-3xl font-bold text-slate-300 hover:text-white">
               Rapid-Go
             </a>
             <div className="hidden md:block ml-10 space-x-4">
@@ -41,7 +41,7 @@ const Navbar: React.FC = () => {
                       {username}
                     </a>
                   </span>
-                  <a href="" onClick={() => { localStorage.clear(); setLogged(false)}} className="px-4 py-2 text-sm bg-slate-600 hover:bg-slate-500 rounded">
+                  <a href="" onClick={() => { localStorage.clear(); setLogged(false)}} className="px-4 py-2 bg-slate-600 hover:bg-slate-500 rounded">
                     Logout
                   </a>
                 </div>
@@ -98,7 +98,9 @@ const Navbar: React.FC = () => {
             {logged ? (
               <div className="flex flex-col">
                 <span className="px-4 py-2 font-bold text-slate-300">
-                  {username}
+                  <a href="" onClick={() => { nav(`/profile/${username}`)}} className="hover:underline">
+                    {username}
+                  </a>
                 </span>
                 <a href="" onClick={() => { localStorage.clear(); setLogged(false)}} className="block px-3 py-2 rounded-md text-base font-medium bg-slate-600 hover:bg-slate-500">
                   Logout

@@ -10,8 +10,8 @@ import (
     "database/sql"
     "github.com/gin-gonic/gin"
     "github.com/gorilla/websocket"
-    "github.com/vanshjangir/ligo/server/internal/core"
-    "github.com/vanshjangir/ligo/server/internal/database"
+    "github.com/vanshjangir/rapid-go/server/internal/core"
+    "github.com/vanshjangir/rapid-go/server/internal/database"
 )
 
 var Pmap map[string]*core.Game;
@@ -47,26 +47,28 @@ func handleMove(p *core.Player, msgBytes []byte, ) error {
     if ok := p.Game.CheckTurn(p.Color); !ok {
         moveStatus.MoveStatus = false
         moveStatus.TurnStatus = false
+        moveStatus.State, _ = p.Game.Board.Encode()
         moveStatus.Move = moveMsg.Move
         p.SelfConn.WriteJSON(moveStatus)
         return nil
     }
 
-    if ok := p.Game.CheckValidMove(moveMsg.Move, p.Color); !ok {
+    if _, err := p.Game.UpdateState(moveMsg.Move, p.Color); err != nil {
         moveStatus.TurnStatus = true
         moveStatus.MoveStatus = false
+        moveStatus.State, _ = p.Game.Board.Encode()
         moveStatus.Move = moveMsg.Move
         p.SelfConn.WriteJSON(moveStatus)
+        fmt.Println("ERROR", err);
         return nil
     }
-
-    p.Game.UpdateState(moveMsg.Move, p.Color)
 
     p.Game.TapClock(p.Color)
     p.Game.Turn = 1 - p.Color
 
     moveStatus.MoveStatus = true
     moveStatus.TurnStatus = true
+    moveStatus.State, _ = p.Game.Board.Encode()
     moveStatus.Move = moveMsg.Move
     moveStatus.SelfTime = p.Game.GetTime(p.Color)
     moveStatus.OpTime = p.Game.GetTime(1 - p.Color)
@@ -77,6 +79,7 @@ func handleMove(p *core.Player, msgBytes []byte, ) error {
     
     moveMsg.OpTime = moveStatus.SelfTime
     moveMsg.SelfTime = moveStatus.OpTime
+    moveMsg.State, _ = p.Game.Board.Encode()
 
     if err := p.OpConn.WriteJSON(moveMsg); err != nil {
         return fmt.Errorf("Error sending move msg: %v", err)
@@ -128,7 +131,7 @@ func handleGameOver(g *core.Game, winner int, wonby string) {
 }
 
 func saveGame(db *sql.DB, g *core.Game, winner int, wonby string) error {
-    insertQuery := "INSERT INTO games (gameid, white, black, winner, wonby, moves) VALUES ($1, $2, $3, $4, $5, $6)"
+    insertQuery := "INSERT INTO games (gameid, white, black, winner, wonby, moves, date) VALUES ($1, $2, $3, $4, $5, $6, $7)"
     if _, err := db.Exec(
         insertQuery,
         g.Id,
@@ -137,6 +140,7 @@ func saveGame(db *sql.DB, g *core.Game, winner int, wonby string) error {
         winner,
         wonby,
         strings.Join(g.History, "/"),
+        time.Now().UTC(),
         ); err != nil {
         return err
     }
@@ -167,14 +171,19 @@ func handleSyncState(p *core.Player) {
     syncMsg.Type = "sync"
     syncMsg.Color = p.Color
     syncMsg.GameId = p.Game.Id
-    if p.Game.Turn == p.Color {
-        syncMsg.Turn = true
-    }
-    syncMsg.State = p.Game.State
-    syncMsg.Liberty = p.Game.Liberty
     syncMsg.History = p.Game.History
     syncMsg.SelfTime = p.Game.GetTime(p.Color)
     syncMsg.OpTime = p.Game.GetTime(1 - p.Color)
+
+    if p.Game.Turn == p.Color {
+        syncMsg.Turn = true
+    }
+
+    if state, err := p.Game.Board.Encode(); err != nil {
+        log.Println("Error encoding board state:", err)
+    } else {
+        syncMsg.State = state
+    }
 
     if err := p.SelfConn.WriteJSON(syncMsg); err != nil {
         log.Println("Error sending sync msg:", err)
@@ -214,10 +223,10 @@ func handleRecv (p *core.Player) error {
             return err
         }
 
-        if ok, winner := p.Game.IsOver(); ok {
+        if winner := p.Game.IsOver(); winner != -1 {
             handleGameOver(p.Game, winner, "move")
             close(p.Game.Over)
-            return fmt.Errorf("Game Over by move")
+            return fmt.Errorf("Game over by move")
         }
 
     case "abort":
@@ -260,18 +269,21 @@ func monitorTimeout(g *core.Game) {
             if g.Pblack.DisConn && g.Pblack.CheckDisConnTime() {
                 winner := 1 - g.Pblack.Color
                 handleGameOver(g, winner, "discn")
+                close(g.Over)
                 log.Println("Game over by disconnection")
                 return
             }
             if g.Pwhite.DisConn && g.Pwhite.CheckDisConnTime() {
                 winner := 1 - g.Pwhite.Color
                 handleGameOver(g, winner, "discn")
+                close(g.Over)
                 log.Println("Game over by disconnection")
                 return
             }
             if g.CheckTimeout() {
                 winner := 1 - g.Turn
                 handleGameOver(g, winner, "time")
+                close(g.Over)
                 log.Println("Game over by timeout")
                 return
             }

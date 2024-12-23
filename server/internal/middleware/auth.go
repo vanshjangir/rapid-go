@@ -1,15 +1,20 @@
 package middleware
 
 import (
-    "os"
-    "fmt"
-    "net/http"
-    "strings"
-    "strconv"
+	"context"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
 
-    "github.com/gin-gonic/gin"
-    "github.com/golang-jwt/jwt/v5"
-    "github.com/google/uuid"
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	"github.com/vanshjangir/rapid-go/server/internal/database"
+	"google.golang.org/api/oauth2/v2"
+	"google.golang.org/api/option"
 )
 
 const (
@@ -41,6 +46,20 @@ func verifyToken(tokenString string) (*jwt.Token, error) {
     return token, nil
 }
 
+func verifyGoogleToken(ctx context.Context, token string) (*oauth2.Tokeninfo, error) {
+    oauth2Service, err := oauth2.NewService(ctx, option.WithAPIKey(os.Getenv("GOOGLE_CLIENT_ID")))
+    if err != nil {
+        return nil, err
+    }
+
+    tokenInfo, err := oauth2Service.Tokeninfo().IdToken(token).Do()
+    if err != nil {
+        return nil, err
+    }
+
+    return tokenInfo, nil
+}
+
 func Auth(ctx *gin.Context) {
     authHeader := strings.Split(ctx.GetHeader("Sec-WebSocket-Protocol"), ", ")
     if authHeader[1] == "" {
@@ -70,13 +89,35 @@ func Auth(ctx *gin.Context) {
         }
         ctx.Set("username", claims["username"])
         ctx.Next()
+
     case TOKEN_TYPE_OAUTH:
-        ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Support will be added soon"})
-        ctx.Abort()
+        tokenInfo, err := verifyGoogleToken(ctx, token[1:])
+        if err != nil {
+            log.Println("Google verification failed:", err)
+            ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Google token"})
+            ctx.Abort()
+            return
+        }
+        var username string
+        db := database.ConnectDatabase()
+        query := "SELECT username FROM users WHERE email = $1"
+        
+        if err := db.QueryRow(query, tokenInfo.Email).Scan(&username);
+        err != nil {
+            log.Println("Google query failed")
+            ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Username not found"})
+            ctx.Abort()
+            return
+        }
+        
+        ctx.Set("username", username)
+        ctx.Next()
+
     case TOKEN_TYPE_GUEST:
         uniqueId := int(uuid.New().ID())
         ctx.Set("username", "G"+strconv.Itoa(uniqueId))
         ctx.Next()
+
     default:
         fmt.Printf("Unknown token type: %v\n", token[:1])
         ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unsupported token type"})

@@ -1,7 +1,6 @@
 package routes
 
 import (
-    "fmt"
     "github.com/gin-gonic/gin"
 )
 
@@ -15,8 +14,6 @@ func IsPending(ctx *gin.Context) {
         ctx.JSON(400, gin.H{"error": "Invalid request body"})
         return
     }
-
-    fmt.Println("USERname", pData.Username);
 
     _, ok := Pmap[pData.Username]
     if ok {

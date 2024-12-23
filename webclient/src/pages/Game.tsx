@@ -3,6 +3,7 @@ import { useGlobalContext } from "../GlobalContext";
 import { ChatMessage, MsgChat, MsgLose, MsgMove, MsgMoveStatus, MsgSync, MsgWin } from "../types/game";
 import { GameState } from "../types/game";
 import Navbar from "../components/Navbar";
+import { Inflate } from "pako";
 
 const WHITE_CELL = 0;
 const BLACK_CELL = 1;
@@ -27,13 +28,13 @@ const Game: React.FC = () => {
     gameId: player.gameId,
     color: player.color,
     state: Array.from({ length: 19 }, () => Array(19).fill(EMPTY_CELL)),
-    liberty: Array.from({ length: 19 }, () => Array(19).fill(4)),
     turn: player.color === 1 ? true : false,
     history: []
   };
 
   let gridSize = 684;
   let cellSize = gridSize / 19;
+  let boardOffset = cellSize/2;
   let playerTime = 900;
   let opponentTime = 900;
   let newMessage = "";
@@ -52,16 +53,16 @@ const Game: React.FC = () => {
     context.lineWidth = 1;
 
     for (let i = 0; i < gridCount; i++) {
-      const pos = (i + 1) * cellSize;
+      const pos = (i + 1) * cellSize + boardOffset;
 
       context.beginPath();
-      context.moveTo(pos, cellSize);
-      context.lineTo(pos, gridSize);
+      context.moveTo(pos, cellSize + boardOffset);
+      context.lineTo(pos, gridSize + boardOffset);
       context.stroke();
 
       context.beginPath();
-      context.moveTo(cellSize, pos);
-      context.lineTo(gridSize, pos);
+      context.moveTo(cellSize + boardOffset, pos);
+      context.lineTo(gridSize + boardOffset, pos);
       context.stroke();
     }
 
@@ -73,25 +74,25 @@ const Game: React.FC = () => {
     for (let i = 0; i < gridCount; i++) {
       const x = (i + 1) * cellSize;
       const label = String.fromCharCode(65 + i);
-      context.fillText(label, x, cellSize / 2);
+      context.fillText(label, x + boardOffset, boardOffset);
     }
     
     for (let i = 0; i < gridCount; i++) {
       const x = (i + 1) * cellSize;
       const label = String.fromCharCode(65 + i);
-      context.fillText(label, x, gridSize + cellSize / 2);
+      context.fillText(label, x + boardOffset, gridSize + cellSize + boardOffset);
     }
 
     for (let i = 0; i < gridCount; i++) {
       const y = (i + 1) * cellSize;
       const label = (i + 1).toString();
-      context.fillText(label, cellSize / 2, y);
+      context.fillText(label, cellSize / 2, y + boardOffset);
     }
 
     for (let i = 0; i < gridCount; i++) {
       const y = (i + 1) * cellSize;
       const label = (i + 1).toString();
-      context.fillText(label, gridSize + cellSize / 2, y);
+      context.fillText(label, gridSize + cellSize + boardOffset, y + boardOffset);
     }
 
     ctxRef.current = context;
@@ -102,8 +103,8 @@ const Game: React.FC = () => {
     canvas: HTMLCanvasElement
   ): { col: string; row: number } | null => {
     const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left - cellSize;
-    const y = event.clientY - rect.top - cellSize;
+    const x = event.clientX - rect.left - cellSize - boardOffset;
+    const y = event.clientY - rect.top - cellSize - boardOffset;
     const col = String.fromCharCode(Math.round(x / cellSize) + 97);
     const row = Math.round(y / cellSize);
 
@@ -127,7 +128,7 @@ const Game: React.FC = () => {
     }
   };
 
-  const placeStone = (move: string, color: number) => {
+  const placeStone = (col:number, row:number, color: number) => {
     const canvas = canvasRef.current;
     const ctx = ctxRef.current;
 
@@ -135,12 +136,9 @@ const Game: React.FC = () => {
       console.log("Canvas or Ctx undefined");
       return;
     }
-
-    const col = move.charCodeAt(0) - 97;
-    const row = parseInt(move.slice(1));
-
-    const x = col * cellSize + cellSize;
-    const y = row * cellSize + cellSize;
+   
+    const x = col * cellSize + cellSize + boardOffset;
+    const y = row * cellSize + cellSize + boardOffset;
 
     const stoneImage = new Image();
     if (color === WHITE_CELL) {
@@ -155,20 +153,32 @@ const Game: React.FC = () => {
     };
   };
 
-  const updateState = (move: string, color: number) => {
-    const col = move.charCodeAt(0) - 97;
-    const row = parseInt(move.slice(1));
-    if (gameStateRef.current) {
-      const gameState = gameStateRef.current;
-      if (!gameState.history) gameState.history = [];
+  const clearCell = (col: number, row: number) => {
+    const ctx = ctxRef.current;
+    if (!ctx) return;
 
-      gameState.state[col][row] = color;
-      gameState.turn = !gameState.turn;
-      gameState.history.push(move);
-      updateHistory(gameState.history);
-      showMoveStatus(move);
-      console.log("GameState", gameStateRef.current)
-    }
+    const x = col * cellSize + cellSize + boardOffset;
+    const y = row * cellSize + cellSize + boardOffset;
+
+    const startx = cellSize + boardOffset;
+    const starty = cellSize + boardOffset;
+    const endx = gridSize + boardOffset;
+    const endy = gridSize + boardOffset;
+    
+    ctx.clearRect(x - cellSize/2, y - cellSize/2, cellSize, cellSize);
+    
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 1;
+    
+    ctx.beginPath();
+    ctx.moveTo(Math.max(x - cellSize/2, startx), y);
+    ctx.lineTo(Math.min(x + cellSize/2, endx), y);
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.moveTo(x, Math.max(y - cellSize/2, starty));
+    ctx.lineTo(x, Math.min(y + cellSize/2, endy));
+    ctx.stroke();
   };
 
   const getGameState = async () => {
@@ -196,6 +206,83 @@ const Game: React.FC = () => {
     }
   };
 
+  const decodeState = (state: string, move: string) => {
+    try {
+      if (!gameStateRef.current) return;
+      const gameState = gameStateRef.current;
+      const base64Enc = state.replace(/-/g, '+').replace(/_/g, '/');
+      const data = Uint8Array.from(atob(base64Enc), char => char.charCodeAt(0));
+      const size = data[0];
+      const dict = new Uint8Array([2, 1, 0]);
+      const inflater = new Inflate({
+        windowBits: -15,
+        dictionary: dict
+      });
+
+      let newMoves: {x:number; y:number; c:number}[] = [];
+      
+      try {
+        inflater.push(data.slice(1), true);
+      } catch (e) {
+        console.error('Inflation error:', e);
+        throw e;
+      }
+
+      if (inflater.err) {
+        throw new Error(`Decompression failed: ${inflater.msg}`);
+      }
+
+      const decompressed = inflater.result;
+      let pos = 0;
+
+      for (let j = 0; j < size; j++) {
+        for (let i = 0; i < size; i++) {
+          if (pos >= decompressed.length) {
+            throw new Error('Unexpected end of decompressed data');
+          }
+          const c = decompressed[pos++];
+          switch (c) {
+            case 2:
+              if (gameState.state[i][j] != BLACK_CELL) {
+                newMoves.push({x:i, y:j, c:BLACK_CELL});
+              }
+              break;
+            case 1:
+              if (gameState.state[i][j] != WHITE_CELL) {
+                newMoves.push({x:i, y:j, c:WHITE_CELL});
+              }
+              break;
+            case 0:
+              if (gameState.state[i][j] != EMPTY_CELL) {
+                newMoves.push({x:i, y:j, c:EMPTY_CELL});
+              }
+              break;
+          }
+        }
+      }
+
+      newMoves.forEach((item) => {
+        gameState.state[item.x][item.y] = item.c;
+        if (item.c === EMPTY_CELL) {
+          clearCell(item.x, item.y);
+          return;
+        }
+      
+
+        gameState.turn = !gameState.turn;
+        showMoveStatus(move);
+        placeStone(item.x, item.y, item.c);
+      })
+
+      if (!gameState.history) gameState.history = [];
+      gameState.history.push(move);
+      updateHistory(gameState.history);
+    } catch (error) {
+      console.error('Decode error:', error);
+      throw error;
+    }
+  };
+
   const handleAbort = () => {
     const socket = socketRef.current;
     if (socket) {
@@ -210,6 +297,7 @@ const Game: React.FC = () => {
   const handleSocketRecv = async (data: any) => {
     const msg: MsgMove | MsgMoveStatus | MsgSync | MsgWin | MsgLose | MsgChat =
       await JSON.parse(data);
+    console.log("MoveStatus", msg);
     switch (msg.type) {
       case "movestatus":
         if (!msg.turnStatus) {
@@ -221,8 +309,18 @@ const Game: React.FC = () => {
           break;
         }
         if (gameStateRef.current) {
-          updateState(msg.move, gameStateRef.current.color);
-          placeStone(msg.move, gameStateRef.current.color);
+          const gameState = gameStateRef.current;
+          
+          if (msg.move === "ps") {
+            if (!gameState.history) gameState.history = [];
+            gameState.history.push(msg.move);
+            gameState.turn = !gameState.turn;
+            updateHistory(gameState.history);
+            showMoveStatus("Pass");
+          } else {
+            decodeState(msg.state, msg.move);
+          }
+          
           playerTime = 900 - Math.round(msg.selfTime/1000);
           opponentTime = 900 - Math.round(msg.opTime/1000);
         }
@@ -230,14 +328,15 @@ const Game: React.FC = () => {
 
       case "move":
         if (gameStateRef.current) {
-          updateState(
-            msg.move,
-            gameStateRef.current.color === WHITE_CELL ? BLACK_CELL : WHITE_CELL
-          );
-          placeStone(
-            msg.move,
-            gameStateRef.current.color === WHITE_CELL ? BLACK_CELL : WHITE_CELL
-          );
+          const gameState = gameStateRef.current;
+          if (msg.move === "ps") {
+            gameState.history.push(msg.move);
+            gameState.turn = !gameState.turn;
+            updateHistory(gameState.history);
+            showMoveStatus("Pass");
+          } else {
+            decodeState(msg.state, msg.move);
+          }
           playerTime = 900 - Math.round(msg.selfTime/1000);
           opponentTime = 900 - Math.round(msg.opTime/1000);
         }
@@ -250,8 +349,9 @@ const Game: React.FC = () => {
           gameState.gameId = msg.gameId,
           gameState.color = msg.color,
           gameState.turn = msg.turn,
-          gameState.state = msg.state,
-          gameState.liberty = msg.liberty,
+          
+          decodeState(msg.state, ""),
+          
           gameState.history = msg.history,
           playerTime = 900 - Math.round(msg.selfTime/1000);
           opponentTime = 900 - Math.round(msg.opTime/1000);
@@ -265,7 +365,7 @@ const Game: React.FC = () => {
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
         }
-        showEndMessage("You Won", true)
+        showEndMessage("You Won")
         destSocket();
         console.log("You Won!!")
         break;
@@ -274,7 +374,7 @@ const Game: React.FC = () => {
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
         }
-        showEndMessage("You Lost", false)
+        showEndMessage("You Lost")
         destSocket();
         console.log("You Lost :(")
         break;
@@ -312,8 +412,8 @@ const Game: React.FC = () => {
 
     const canvas = canvasRef.current;
     if (canvas) {
-      canvas.width = gridSize + cellSize;
-      canvas.height = gridSize + cellSize;
+      canvas.width = gridSize + 2 * cellSize;
+      canvas.height = gridSize + 2 * cellSize;
     }
     drawBoard();
 
@@ -321,7 +421,7 @@ const Game: React.FC = () => {
       for (let i = 0; i < 19; i++) {
         for (let j = 0; j < 19; j++) {
           if (gameStateRef.current.state[i][j] !== EMPTY_CELL) {
-            placeStone(`${String.fromCharCode(i + 97)}${j + 1}`, gameStateRef.current.state[i][j]);
+            placeStone(i, j, gameStateRef.current.state[i][j]);
           }
         }
       }
@@ -361,19 +461,26 @@ const Game: React.FC = () => {
     }
   }
 
-  const showEndMessage = (msg: string, win: boolean) => {
+  const showEndMessage = (msg: string) => {
     if (msgRef.current) {
-      if (win) {
-        msgRef.current.className = "text-center text-3xl font-bold h-[40px]";
-        msgRef.current.innerText = msg;
-      } else {
-        msgRef.current.className = "text-center text-3xl font-bold h-[40px]";
-        msgRef.current.innerText = msg;
-      }
+      msgRef.current.className = "text-center text-3xl font-bold h-[40px]";
+      msgRef.current.innerText = msg;
     }
   }
 
   const updateHistory = (history: string[]) => {
+    if (history.length > 2) {
+      const last = history[history.length - 1];
+      const slast = history[history.length - 2];
+      if (last === "ps" && slast === "ps") {
+        if (msgRef.current) {
+          console.log("aya", history);
+          msgRef.current.className = "text-center text-3xl font-bold h-[40px]";
+          msgRef.current.innerText = "Evaluating...";
+        }
+      }
+    }
+
     if (historyDivRef.current) {
       historyDivRef.current.innerHTML = "";
       history.forEach((_, index) => {
@@ -473,14 +580,14 @@ const Game: React.FC = () => {
   return (
     <div className="h-screen flex flex-col bg-[#222222] overflow-y-auto">
       <Navbar />
-      <div id="game-container" className="w-full flex flex-col items-center justify-center lg:flex-row">
+      <div id="game-container" className="w-full flex flex-col items-center mt-8 justify-center lg:flex-row">
         <div id="game-board" className="flex flex-col items-center">
           <canvas
             ref={canvasRef}
             id="canvas"
             className="bg-yellow-200"
-            width={gridSize + cellSize}
-            height={gridSize + cellSize}
+            width={gridSize + 2 * cellSize}
+            height={gridSize + 2 * cellSize}
           ></canvas>
           <div className="flex text-white w-full justify-between">
             <div className="text-center">
@@ -505,7 +612,7 @@ const Game: React.FC = () => {
               className="bg-red-500 rounded-r-lg p-2 w-[150px]"
             >Abort</button>
           </div>
-          <div className="flex flex-col text-white h-[250px] w-[400px] items-center">
+          <div className="flex flex-col text-white h-[240px] w-[400px] items-center">
             <div
               ref={historyDivRef}
               className="flex flex-col overflow-y-auto h-full w-full bg-[#181818] rounded"
@@ -516,7 +623,7 @@ const Game: React.FC = () => {
             <div className="mb-2">Chat</div>
             <div
               ref={chatRef}
-              className="flex flex-col overflow-y-auto h-[250px] w-full bg-[#181818] rounded"
+              className="flex flex-col overflow-y-auto h-[240px] w-full bg-[#181818] rounded"
               style={{ maxHeight: "250px", padding: "10px" }}
             >
             </div>

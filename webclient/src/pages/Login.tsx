@@ -63,6 +63,8 @@ const Login: React.FC = () => {
       const json = await response.json();
       console.log("Login successful");
       localStorage.setItem("token", json.token);
+      localStorage.setItem("username", json.username);
+      localStorage.setItem('isLoggedIn', 'true');
       setUsername(json.username);
       nav("/");
     } else {

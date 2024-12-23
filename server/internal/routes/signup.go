@@ -4,7 +4,7 @@ import (
     "log"
     "database/sql"
     "github.com/gin-gonic/gin"
-    "github.com/vanshjangir/ligo/server/internal/database"
+    "github.com/vanshjangir/rapid-go/server/internal/database"
 )
 
 type signupData struct {

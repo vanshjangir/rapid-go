@@ -30,6 +30,7 @@ export interface MsgMoveStatus {
   turnStatus: string;
   moveStatus: string;
   move: string;
+  state: string;
   selfTime: number;
   opTime: number;
 }
@@ -37,6 +38,7 @@ export interface MsgMoveStatus {
 export interface MsgMove {
   type: "move";
   move: string;
+  state: string;
   selfTime: number;
   opTime: number;
 }
@@ -45,8 +47,7 @@ export interface MsgSync {
   type: "sync";
   gameId: string;
   color: number;
-  state: number[][];
-  liberty: number[][];
+  state: string;
   turn: boolean;
   history: string[];
   selfTime: number;
@@ -62,7 +63,6 @@ export interface GameState {
   gameId: string;
   color: number;
   state: number[][];
-  liberty: number[][];
   turn: boolean;
   history: string[];
 }
@@ -70,4 +70,18 @@ export interface GameState {
 export interface ChatMessage {
   type: "sent" | "received";
   text: string;
+}
+
+export interface UserProfileData {
+  name: string;
+  rating: number;
+  gamesPlayed: number;
+  wins: number;
+  losses: number;
+  highestRating: number;
+  recentGames: {
+    opponent: string;
+    result: string;
+    date: string;
+  }[];
 }

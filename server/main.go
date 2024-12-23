@@ -8,10 +8,10 @@ import (
     "github.com/joho/godotenv"
     _ "github.com/lib/pq"
 
-    "github.com/vanshjangir/ligo/server/internal/core"
-    "github.com/vanshjangir/ligo/server/internal/routes"
-    "github.com/vanshjangir/ligo/server/internal/database"
-    "github.com/vanshjangir/ligo/server/internal/middleware"
+    "github.com/vanshjangir/rapid-go/server/internal/core"
+    "github.com/vanshjangir/rapid-go/server/internal/routes"
+    "github.com/vanshjangir/rapid-go/server/internal/database"
+    "github.com/vanshjangir/rapid-go/server/internal/middleware"
 )
 
 func main(){
@@ -27,6 +27,7 @@ func main(){
     r.POST("/login", routes.Login)
     r.POST("/signup", routes.Signup)
     r.GET("/isPending", routes.IsPending)
+    r.GET("/profile", routes.Profile)
 
     if err := godotenv.Load(); err != nil {
         log.Fatal("Error loading env variables: ", err);

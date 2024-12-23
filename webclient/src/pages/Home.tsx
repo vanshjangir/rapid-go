@@ -94,25 +94,26 @@ const Home = () => {
     <div className="h-screen bg-[#222222] flex flex-col text-white">
       <Navbar />
       <div className="flex flex-col w-full justify-center items-center lg:flex-row">
-        <div className="hidden lg:inline-flex lg:pt-[12vw]">
-          <img src="/whitestone.png"/>
+        <div className="hidden lg:inline-flex lg:pt-[200px] mr-4">
+          <img src="/boardbg.png" className="shadow-black w-[400px] rounded"/>
         </div>
         <div>
-          <div className="flex flex-col items-center justify-center pt-[12vw] space-y-4">
+          <div className="flex flex-col items-center justify-center pt-[280px] space-y-4">
+            <p className="text-4xl font-bold">Online Go!</p>
             {matchStatus === "pending" ? (
               <p className="text-lg">Finding an opponent...</p>
             ) : (
                 <p className="text-lg">Ready to start a game?</p>
-              )}
+            )}
             <button
               onClick={() => play("player")}
-              className="w-[200px] py-3 bg-blue-600 rounded hover:bg-blue-500 focus:outline-none focus:ring focus:ring-blue-300"
+              className="w-[400px] text-4xl font-bold py-6 bg-[#614231] rounded hover:bg-[#715241] focus:outline-none focus:ring hover:shadow-[0_0_20px_5px_#715241]"
             >
               Play
             </button>
             <button
               onClick={() => play("guest")}
-              className="w-[200px] py-3 bg-blue-600 rounded hover:bg-blue-500 focus:outline-none focus:ring focus:ring-blue-300"
+              className="w-[400px] text-4xl font-bold py-6 bg-[#614231] rounded hover:bg-[#715241] focus:outline-none focus:ring hover:shadow-[0_0_20px_5px_#715241]"
             >
               Play as Guest
             </button>
