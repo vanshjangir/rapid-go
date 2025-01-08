@@ -16,7 +16,10 @@ var(
 
 func ConnectDatabase () *sql.DB {
     once.Do( func() {
-        host := "localhost"
+        host := os.Getenv("POSTGRES_HOST")
+        if host == "" {
+            host = "localhost"
+        }
         port, _ := strconv.Atoi(os.Getenv("POSTGRES_PORT"))
         user := os.Getenv("POSTGRES_USER")
         password := os.Getenv("POSTGRES_PASSWORD")

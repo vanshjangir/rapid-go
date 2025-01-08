@@ -47,10 +47,10 @@ const Navbar: React.FC = () => {
                 </div>
               ) : (
                 <>
-                  <a href="/login" className="px-4 py-2 text-sm bg-slate-600 hover:bg-slate-500 rounded">
+                  <a href="/login" className="px-4 py-2 bg-slate-600 hover:bg-slate-500 rounded">
                     Login
                   </a>
-                  <a href="/signup" className="ml-2 px-4 py-2 text-sm bg-blue-600 hover:bg-blue-500 rounded">
+                  <a href="/signup" className="ml-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded">
                     Sign Up
                   </a>
                 </>

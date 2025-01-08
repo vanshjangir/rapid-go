@@ -100,6 +100,7 @@ func verifyGoogleToken(ctx context.Context, token string) (*oauth2.Tokeninfo, er
 func loginByGoogle(ctx *gin.Context, req *loginData) {
     tokenInfo, err := verifyGoogleToken(ctx, req.Credential)
     if err != nil {
+        log.Println("ERROR:", err);
         ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Google token"})
         return
     }
