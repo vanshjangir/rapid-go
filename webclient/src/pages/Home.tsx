@@ -27,7 +27,7 @@ const Home = () => {
 
   const findMatch = (token: string) => {
     console.log("Token", token);
-    const socket = connect(wsapi + "/game?type=new", ["Authorization", token]);
+    const socket = connect(wsapi + "/game?type=new&token=" + token);
 
     socket.onmessage = async (event: MessageEvent) => {
       if (event.data === "pending") {
@@ -48,7 +48,7 @@ const Home = () => {
 
   const reconnect = () => {
     console.log("Token", token);
-    const socket = connect(wsapi + "/game?type=reconnect", ["Authorization", token]);
+    const socket = connect(wsapi + "/game?type=reconnect&token=" + token);
 
     socket.onmessage = async (event: MessageEvent) => {
       const json: MsgStart = await JSON.parse(event.data);

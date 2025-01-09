@@ -1,20 +1,18 @@
 package middleware
 
 import (
-	"context"
-	"fmt"
-	"log"
-	"net/http"
-	"os"
-	"strconv"
-	"strings"
-
-	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
-	"github.com/vanshjangir/rapid-go/server/internal/database"
-	"google.golang.org/api/oauth2/v2"
-	"google.golang.org/api/option"
+    "context"
+    "fmt"
+    "log"
+    "net/http"
+    "os"
+    "strconv"
+    "github.com/gin-gonic/gin"
+    "github.com/golang-jwt/jwt/v5"
+    "github.com/google/uuid"
+    "github.com/vanshjangir/rapid-go/server/internal/database"
+    "google.golang.org/api/oauth2/v2"
+    "google.golang.org/api/option"
 )
 
 const (
@@ -61,16 +59,15 @@ func verifyGoogleToken(ctx context.Context, token string) (*oauth2.Tokeninfo, er
 }
 
 func Auth(ctx *gin.Context) {
-    authHeader := strings.Split(ctx.GetHeader("Sec-WebSocket-Protocol"), ", ")
-    if authHeader[1] == "" {
-        ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header missing"})
+
+    token := ctx.DefaultQuery("token", "")
+    if token == "" {
+        ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Token query param missing"})
         ctx.Abort()
         return
     }
 
-    fmt.Println("Headers", authHeader)
-
-    token := authHeader[1]
+    log.Println("Token", token);
 
     switch token[:1] {
     case TOKEN_TYPE_JWT:

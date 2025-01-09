@@ -8,7 +8,7 @@ interface GlobalContextType {
   isLoggedIn: boolean;
   username: string;
   setUsername: (username: string) => void;
-  connect: (url: string, header: any) => WebSocket;
+  connect: (url: string) => WebSocket;
   getSocket: () => WebSocket | null;
   destSocket: () => void;
 }
@@ -49,9 +49,9 @@ export const GlobalProvider: React.FC<GlobalProps> = ({ children }) => {
     socketRef.current = null;
   };
 
-  const connect = (url: string, header: any): WebSocket => {
+  const connect = (url: string): WebSocket => {
     if(!socketRef.current){
-      socketRef.current = new WebSocket(url, header);
+      socketRef.current = new WebSocket(url);
     }
     return socketRef.current;
   }
