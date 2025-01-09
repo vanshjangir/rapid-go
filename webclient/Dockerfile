@@ -10,7 +10,7 @@ COPY . .
 
 ARG ENV_FILE
 
-COPY $ENV_FILE .env
+COPY $ENV_FILE .env.production
 
 RUN npm run build
 

@@ -101,28 +101,30 @@ const Game: React.FC = () => {
   const getCanvasCoordinates = (
     event: MouseEvent,
     canvas: HTMLCanvasElement
-  ): { col: string; row: number } | null => {
+  ): { x: number; y: number } | null => {
     const rect = canvas.getBoundingClientRect();
     const x = event.clientX - rect.left - cellSize - boardOffset;
     const y = event.clientY - rect.top - cellSize - boardOffset;
-    const col = String.fromCharCode(Math.round(x / cellSize) + 97);
-    const row = Math.round(y / cellSize);
-
-    return { col, row };
+    return { x: Math.round(x / cellSize), y: Math.round(y / cellSize)};
   };
 
   const handleCanvasClick = (event: MouseEvent) => {
     event.stopPropagation();  
     const canvas = canvasRef.current;
     const socket = socketRef.current;
+    const gameState = gameStateRef.current;
     if (!canvas) return;
 
     const coords = getCanvasCoordinates(event, canvas);
-    if (coords && socket) {
+    
+    if (coords && socket && gameState) {
+      const col = String.fromCharCode(coords.x + 97);
+      const row = coords.y;
+      placeStone(coords.x, coords.y, gameState.color);
       socket.send(
         JSON.stringify({
           type: "move",
-          move: coords.col + coords.row
+          move: col + row
         })
       );
     }
@@ -302,10 +304,17 @@ const Game: React.FC = () => {
       case "movestatus":
         if (!msg.turnStatus) {
           showMoveStatus("Not your turn");
+          const x = msg.move[0].charCodeAt(0) - 'a'.charCodeAt(0);
+          const y = Number(msg.move.slice(1));
+          console.log("col", x, y);
+          clearCell(x,y);
           break;
         }
         if (!msg.moveStatus) {
           showMoveStatus("Invalid move");
+          const x = msg.move[0].charCodeAt(0) - 'a'.charCodeAt(0);
+          const y = Number(msg.move.slice(1));
+          clearCell(x,y);
           break;
         }
         if (gameStateRef.current) {
