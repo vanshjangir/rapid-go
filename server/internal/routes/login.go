@@ -64,6 +64,11 @@ func loginByEmail(ctx *gin.Context, req *loginData) {
     storedPassword = strings.TrimSpace(storedPassword)
     req.Password = strings.TrimSpace(req.Password)
 
+    if storedPassword == "0" {
+        ctx.JSON(401, gin.H{"error": "Email/Password not found"})
+        return
+    }
+
     if storedPassword != req.Password {
         ctx.JSON(401, gin.H{"error": "Invalid password"})
         return

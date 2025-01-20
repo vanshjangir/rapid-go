@@ -23,11 +23,13 @@ func main(){
         AllowHeaders:   []string{"*"},
     }));
 
-    r.GET("/game", middleware.Auth, routes.ConnectPlayer)
-    r.POST("/login", routes.Login)
-    r.POST("/signup", routes.Signup)
+    r.GET("/game", middleware.WsAuth, routes.ConnectPlayer)
     r.GET("/isPending", routes.IsPending)
     r.GET("/profile", routes.Profile)
+    
+    r.POST("/login", routes.Login)
+    r.POST("/signup", routes.Signup)
+    r.POST("/changeusername", middleware.HttpAuth, routes.ChangeUsername)
 
     if err := godotenv.Load(); err != nil {
         log.Fatal("Error loading env variables: ", err);

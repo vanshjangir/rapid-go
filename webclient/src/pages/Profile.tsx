@@ -7,6 +7,9 @@ const Profile = () => {
   const { username } = useParams();
   const httpapi = import.meta.env.VITE_HTTP_URL;
   const [userData, setUserData] = useState<UserProfileData | null>(null);
+  const token = localStorage.getItem('token');
+  const [textAreaVis, setTextAreaVis] = useState<boolean>(false);
+  const [newUsername, setNewUsername] = useState<string>("");
 
   const getData = async () => {
     try {
@@ -20,6 +23,29 @@ const Profile = () => {
     }
   };
 
+  const changeUsername = async () => {
+    const response = await fetch(httpapi + `/changeusername`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        "token": token,
+        "username": username,
+        "newusername": newUsername,
+      }),
+    });
+
+    if(response.status === 200){
+      localStorage.setItem('username', newUsername);
+    }
+    setTextAreaVis(false)
+  }
+
+  const onButtonClick = () => {
+    setTextAreaVis(true);
+  }
+
   useEffect(() => {
     getData();
   }, []);
@@ -32,7 +58,29 @@ const Profile = () => {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 mt-16">
         <div className="flex items-center gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold">{userData.name || username}</h1>
+            <div className="flex">
+              {textAreaVis === false ?
+                (
+                  <>
+                    <h1 className="text-2xl font-bold">{userData.name || username}</h1>
+                    <button onClick={onButtonClick}><img src="/editpencil.png" width={30} /></button>
+                  </>
+                ) : (
+                  <>
+                    <input
+                      className="bg-[#222222]"
+                      placeholder="username"
+                      autoFocus
+                      onChange={(e) => setNewUsername(e.target.value)}
+                      onKeyDown={(e) => {if(e.key === "Enter") changeUsername();}}
+                    />
+                    <button onClick={changeUsername} className="border-white-50 ml-2">
+                      <img src="/tick.png" className="w-[20px]" />
+                    </button>
+                  </>
+                )
+              }
+            </div>
             <p className="text-gray-300">Rating: {userData.rating}</p>
           </div>
         </div>
@@ -61,7 +109,7 @@ const Profile = () => {
 
         <div>
           <h2 className="text-xl font-semibold mb-4">Recent Games</h2>
-          {userData.recentGames.length > 0 ? (
+          {(userData.recentGames && userData.recentGames.length > 0) ? (
             <ul className="space-y-4">
               {userData.recentGames.map((game, index) => (
                 <li

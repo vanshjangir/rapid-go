@@ -6,6 +6,9 @@ import (
     "log"
     "net/http"
     "os"
+    "io"
+    "bytes"
+    "encoding/json"
     "strconv"
     "github.com/gin-gonic/gin"
     "github.com/golang-jwt/jwt/v5"
@@ -58,16 +61,12 @@ func verifyGoogleToken(ctx context.Context, token string) (*oauth2.Tokeninfo, er
     return tokenInfo, nil
 }
 
-func Auth(ctx *gin.Context) {
-
-    token := ctx.DefaultQuery("token", "")
+func auth(ctx *gin.Context, token string){
     if token == "" {
         ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Token query param missing"})
         ctx.Abort()
         return
     }
-
-    log.Println("Token", token);
 
     switch token[:1] {
     case TOKEN_TYPE_JWT:
@@ -120,4 +119,30 @@ func Auth(ctx *gin.Context) {
         ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unsupported token type"})
         ctx.Abort()
     }
+}
+
+func HttpAuth(ctx *gin.Context) {
+    bodyAsByteArray, _ := io.ReadAll(ctx.Request.Body)
+    ctx.Request.Body = io.NopCloser(bytes.NewBuffer(bodyAsByteArray))
+    
+    jsonMap := make(map[string]interface{})
+    if err := json.Unmarshal(bodyAsByteArray, &jsonMap); err != nil {
+        ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON"})
+        ctx.Abort()
+        return
+    }
+
+    token, ok := jsonMap["token"].(string)
+    if ok {
+        auth(ctx, token);
+    } else {
+        ctx.JSON(http.StatusUnauthorized,
+            gin.H{"error": "Token not found"})
+        ctx.Abort()
+    }
+}
+
+func WsAuth(ctx *gin.Context) {
+    token := ctx.DefaultQuery("token", "")
+    auth(ctx, token);
 }
