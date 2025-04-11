@@ -57,7 +57,7 @@ func Profile(ctx *gin.Context) {
 
     data.Losses = data.GamesPlayed - data.Wins
 
-    query = "SELECT white, black, winner, date FROM games WHERE black = $1 OR white = $1 LIMIT 10"
+    query = "SELECT white, black, winner, date FROM games WHERE black = $1 OR white = $1 ORDER BY created_at DESC LIMIT 10"
     if rows, err := db.Query(query, username);
     err != nil {
         log.Println("Error fetching recent games:",err)

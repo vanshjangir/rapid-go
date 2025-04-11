@@ -13,24 +13,13 @@ const Navbar: React.FC = () => {
   }, []);
 
   return (
-    <nav className="bg-[#222222] text-white text-xl">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+    <nav className="bg-[#222222] text-white text-3xl mt-4">
+      <div className="max-w-4xl  mx-auto sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <a href="/" className="text-3xl font-bold text-slate-300 hover:text-white">
-              Rapid-Go
+            <a href="/" className="text-6xl font-bold text-slate-300 hover:text-white">
+              Rapid Go
             </a>
-            <div className="hidden md:block ml-10 space-x-4">
-              <a href="/learn" className="hover:text-slate-400">
-                Learn
-              </a>
-              <a href="/tournaments" className="hover:text-slate-400">
-                Tournaments
-              </a>
-              <a href="/community" className="hover:text-slate-400">
-                Community
-              </a>
-            </div>
           </div>
           <div className="flex items-center">
             <div className="hidden md:block">
@@ -86,15 +75,6 @@ const Navbar: React.FC = () => {
       {isMenuOpen && (
         <div className="md:hidden">
           <div className="space-y-1 px-2 pt-2 pb-3 sm:px-3">
-            <a href="/learn" className="block px-3 py-2 rounded-md text-base font-medium text-slate-300 hover:text-white hover:bg-gray-700">
-              Learn
-            </a>
-            <a href="/tournaments" className="block px-3 py-2 rounded-md text-base font-medium text-slate-300 hover:text-white hover:bg-gray-700">
-              Tournaments
-            </a>
-            <a href="/community" className="block px-3 py-2 rounded-md text-base font-medium text-slate-300 hover:text-white hover:bg-gray-700">
-              Community
-            </a>
             {logged ? (
               <div className="flex flex-col">
                 <span className="px-4 py-2 font-bold text-slate-300">

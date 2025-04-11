@@ -24,6 +24,7 @@ func main(){
     }));
 
     r.GET("/game", middleware.WsAuth, routes.ConnectPlayer)
+    r.GET("/againstbot", middleware.WsAuth, routes.ConnectAgainstBot)
     r.GET("/isPending", routes.IsPending)
     r.GET("/profile", routes.Profile)
     
@@ -36,7 +37,7 @@ func main(){
         return
     }
 
-    routes.Pmap = make(map[string]*core.Game)
+    core.Pmap = make(map[string]*core.Game)
 
     db := database.ConnectDatabase()
     defer db.Close()

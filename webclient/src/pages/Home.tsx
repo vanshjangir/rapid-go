@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useGlobalContext } from "../GlobalContext";
 import { MsgStart } from "../types/game";
 import Navbar from "../components/Navbar";
+import { PlayButton, ReconnectButton } from "../components/Buttons"
 
 const TOKEN_TYPE_GUEST = "3";
 
@@ -16,18 +17,19 @@ const Home = () => {
   const httpapi = import.meta.env.VITE_HTTP_URL
 
   const play = (how: string) => {
-    if (how === "guest") {
-      findMatch(TOKEN_TYPE_GUEST);
+    if (token) {
+      findMatch(token, how);
     } else {
-      if (token) {
-        findMatch(token);
-      }
+      findMatch(TOKEN_TYPE_GUEST, how);
     }
   }
 
-  const findMatch = (token: string) => {
+  const findMatch = (token: string, how: string) => {
     console.log("Token", token);
-    const socket = connect(wsapi + "/game?type=new&token=" + token);
+    const uri = (how === "bot" ? "/againstbot" : "/game") +
+      "?type=new&token=" + token;
+    const socket = connect(wsapi + uri);
+    localStorage.setItem("rectype", how);
 
     socket.onmessage = async (event: MessageEvent) => {
       if (event.data === "pending") {
@@ -48,7 +50,10 @@ const Home = () => {
 
   const reconnect = () => {
     console.log("Token", token);
-    const socket = connect(wsapi + "/game?type=reconnect&token=" + token);
+    const rectype = localStorage.getItem("rectype") ?
+      localStorage.getItem("rectype") : "player" ;
+    const socket = connect(wsapi +
+      `/game?type=reconnect&rectype=${rectype}&token=${token}`);
 
     socket.onmessage = async (event: MessageEvent) => {
       const json: MsgStart = await JSON.parse(event.data);
@@ -94,39 +99,30 @@ const Home = () => {
     <div className="h-screen bg-[#222222] flex flex-col text-white">
       <Navbar />
       <div className="flex flex-col w-full justify-center items-center lg:flex-row">
-        <div className="hidden lg:inline-flex lg:pt-[200px] mr-4">
+        <div className="hidden lg:inline-flex lg:pt-[200px] mr-8">
           <img src="/boardbg.png" className="shadow-black w-[400px] rounded"/>
         </div>
         <div>
-          <div className="flex flex-col items-center justify-center pt-[280px] space-y-4">
-            <p className="text-4xl font-bold">Online Go!</p>
+          <div className="flex flex-col items-center justify-center pt-[224px] space-y-8">
+            <p className="text-5xl font-bold">Online Go!</p>
             {matchStatus === "pending" ? (
               <p className="text-lg">Finding an opponent...</p>
             ) : (
-                <p className="text-lg">Ready to start a game?</p>
+                <p className="text-lg">
+                  {token ? "Ready to start a game!" : "Login or play as guest"}
+                </p>
             )}
-            <button
-              onClick={() => play("player")}
-              className="w-[400px] text-4xl font-bold py-6 bg-[#614231] rounded hover:bg-[#715241] focus:outline-none focus:ring hover:shadow-[0_0_20px_5px_#715241]"
-            >
-              Play
-            </button>
-            <button
-              onClick={() => play("guest")}
-              className="w-[400px] text-4xl font-bold py-6 bg-[#614231] rounded hover:bg-[#715241] focus:outline-none focus:ring hover:shadow-[0_0_20px_5px_#715241]"
-            >
-              Play as Guest
-            </button>
-            {recon === true ? (
-              <button
-                onClick={reconnect}
-                className="w-[200px] py-3 bg-red-600 rounded hover:bg-red-500 focus:outline-none focus:ring focus:ring-blue-300"
-              >
-                Reconnect
-              </button>
-            ):(
-                <></>
-              )}
+            <PlayButton
+              label={token ? "Play" : "Play as Guest"}
+              gametype="player"
+              handler={play}
+            />
+            <PlayButton
+              label="Against Bot"
+              gametype="bot"
+              handler={play}
+            />
+            {recon === true ? <ReconnectButton handler={reconnect} /> :''}
           </div>
         </div>
       </div>

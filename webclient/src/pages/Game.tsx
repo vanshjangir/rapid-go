@@ -600,12 +600,12 @@ const Game: React.FC = () => {
           ></canvas>
           <div className="flex text-white w-full justify-between">
             <div className="text-center">
-              <span className="text-xl font-bold">Opponent</span>
-              <div className="text-lg" ref={opponentClockRef}></div>
-            </div>
-            <div className="text-center">
               <span className="text-xl font-bold">Player</span>
               <div className="text-lg" ref={playerClockRef}></div>
+            </div>
+            <div className="text-center">
+              <span className="text-xl font-bold">Opponent</span>
+              <div className="text-lg" ref={opponentClockRef}></div>
             </div>
           </div>
         </div>

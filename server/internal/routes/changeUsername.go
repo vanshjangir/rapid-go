@@ -30,7 +30,7 @@ func ChangeUsername(ctx *gin.Context){
     }
 
     query = "UPDATE users SET username = $1 WHERE username = $2"
-    if _, err := db.Exec(query, cu.Username, cu.Newusername);
+    if _, err := db.Exec(query, cu.Newusername, cu.Username);
     err != nil {
         log.Println("DB query error: ", err)
         ctx.JSON(500, gin.H{"error": "Error creating user"})
