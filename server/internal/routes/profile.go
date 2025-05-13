@@ -47,7 +47,7 @@ func Profile(ctx *gin.Context) {
         return
     }
     
-    query = "SELECT COUNT(*) FROM games WHERE (white = $1 AND winner = 1) OR (black = $1 AND winner = 0)"
+    query = "SELECT COUNT(*) FROM games WHERE (white = $1 AND winner = 0) OR (black = $1 AND winner = 1)"
     if err := db.QueryRow(query, username).Scan(&data.Wins);
     err == sql.ErrNoRows {
         log.Println("Error fetching games won")
@@ -73,14 +73,14 @@ func Profile(ctx *gin.Context) {
             rows.Scan(&white, &black, &winner, &date);
             
             if white == username {
-                if winner == 0 {
+                if winner == 1 {
                     recentGame.Result = "Lost"
                 } else {
                     recentGame.Result = "Won"
                 }
                 recentGame.Opponent = black
             } else {
-                if winner == 1 {
+                if winner == 0 {
                     recentGame.Result = "Lost"
                 } else {
                     recentGame.Result = "Won"

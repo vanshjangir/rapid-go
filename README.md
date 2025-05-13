@@ -1,4 +1,4 @@
-# Rapid-go - open source Go server.
+# Rapid-go
 
 ### References
 

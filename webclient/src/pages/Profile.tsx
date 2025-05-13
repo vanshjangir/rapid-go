@@ -50,12 +50,17 @@ const Profile = () => {
     getData();
   }, []);
 
-  if (!userData) return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  if (!userData)
+    return (
+      <div className="h-screen bg-[#222222] flex flex-col text-white">
+        <div className="flex items-center justify-center h-screen">Loading...</div>
+      </div>
+    );
 
   return (
-    <div className="bg-[#222222] h-screen text-white">
+    <div className="h-screen bg-[#222222] flex flex-col text-white">
       <Navbar />
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 mt-16">
+      <div className="max-w-5xl mx-auto w-full px-4 sm:px-6 lg:px-8 mt-16">
         <div className="flex items-center gap-4 mb-6">
           <div>
             <div className="flex">
@@ -63,7 +68,9 @@ const Profile = () => {
                 (
                   <>
                     <h1 className="text-2xl font-bold">{userData.name || username}</h1>
-                    <button onClick={onButtonClick}><img src="/editpencil.png" width={30} /></button>
+                    <button onClick={onButtonClick}>
+                      <img src="/editpencil.png" width={30} />
+                    </button>
                   </>
                 ) : (
                   <>

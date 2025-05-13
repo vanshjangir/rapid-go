@@ -1,15 +1,16 @@
 package core
 
 import (
-	"bufio"
-	"encoding/json"
-	"fmt"
-	"log"
-	"os/exec"
-	"strings"
-	"time"
+    "bufio"
+    "encoding/json"
+    "fmt"
+    "log"
+    "os/exec"
+    "strings"
+    "strconv"
+    "time"
 
-	"github.com/vanshjangir/rapid-go/server/internal/database"
+    "github.com/vanshjangir/rapid-go/server/internal/database"
 )
 
 type GnuGo struct {
@@ -19,7 +20,7 @@ type GnuGo struct {
 }
 
 func NewGnuGo() (*GnuGo, error) {
-	cmd := exec.Command("gnugo", "--mode", "gtp")
+	cmd := exec.Command("/usr/games/gnugo", "--mode", "gtp")
 	stdinPipe, _ := cmd.StdinPipe()
 	stdoutPipe, _ := cmd.StdoutPipe()
 	err := cmd.Start()
@@ -137,7 +138,8 @@ func handleMoveBot(p *Player, msgBytes []byte, engine *GnuGo) error {
 
     var engineMove string
     col := rune(moveMsg.Move[0])
-    row := moveMsg.Move[1:]
+    t,_ := strconv.Atoi(moveMsg.Move[1:])
+    row := strconv.Itoa(t + 1)
     if(moveMsg.Move[0] >= 'i'){
         engineMove = string(col+1) + row
     } else {
@@ -164,7 +166,8 @@ func playBotMove (engine *GnuGo, g *Game) error {
         res = "ps"
     } else {
         col := rune(res[0])
-        row := res[1:]
+        t,_ := strconv.Atoi(res[1:])
+        row := strconv.Itoa(t - 1)
         if(res[0] >= 'i'){
             res = string(col+1 +32) + row
         } else {

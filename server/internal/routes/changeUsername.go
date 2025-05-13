@@ -33,7 +33,23 @@ func ChangeUsername(ctx *gin.Context){
     if _, err := db.Exec(query, cu.Newusername, cu.Username);
     err != nil {
         log.Println("DB query error: ", err)
-        ctx.JSON(500, gin.H{"error": "Error creating user"})
+        ctx.JSON(500, gin.H{"error": "Error updating username in users"})
+        return
+    }
+    
+    query = "UPDATE games SET white = $1 WHERE white = $2"
+    if _, err := db.Exec(query, cu.Newusername, cu.Username);
+    err != nil {
+        log.Println("DB query error: ", err)
+        ctx.JSON(500, gin.H{"error": "Error creating white in games"})
+        return
+    }
+    
+    query = "UPDATE games SET black = $1 WHERE black = $2"
+    if _, err := db.Exec(query, cu.Newusername, cu.Username);
+    err != nil {
+        log.Println("DB query error: ", err)
+        ctx.JSON(500, gin.H{"error": "Error creating black in games"})
         return
     }
 

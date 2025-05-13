@@ -1,8 +1,5 @@
-FROM alpine AS certs
-RUN apk add --no-cache ca-certificates
-
-FROM scratch
-COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+FROM debian:stable-slim
+RUN apt-get update && apt-get install -y gnugo
 
 COPY .env /
 COPY app /

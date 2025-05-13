@@ -466,7 +466,11 @@ const Game: React.FC = () => {
   const showMoveStatus = (msg: string) => {
     if (msgRef.current) {
       msgRef.current.className = "text-center text-xl font-bold h-[40px]";
-      msgRef.current.innerText = msg;
+      if (!isNaN(Number(msg.slice(1,)))) {
+        msgRef.current.innerText = toShow(msg);
+      } else {
+        msgRef.current.innerText = msg === "ps" ? "Pass" : msg;
+      }
     }
   }
 
@@ -475,6 +479,14 @@ const Game: React.FC = () => {
       msgRef.current.className = "text-center text-3xl font-bold h-[40px]";
       msgRef.current.innerText = msg;
     }
+  }
+
+  const toShow = (move: string) => {
+    if (move) {
+      return move === "ps" ? "Pass" :
+      move[0].toUpperCase() + String(Number(move.slice(1,)) + 1);
+    }
+    return "";
   }
 
   const updateHistory = (history: string[]) => {
@@ -499,11 +511,11 @@ const Game: React.FC = () => {
 
           const firstMove = document.createElement("div");
           firstMove.className = "bg-[#282828] w-[50%] text-center";
-          firstMove.textContent = history[index] || "";
+          firstMove.textContent = toShow(history[index]);
 
           const secondMove = document.createElement("div");
           secondMove.className = "bg-[#343434] w-[50%] text-center";
-          secondMove.textContent = history[index + 1] || "";
+          secondMove.textContent = toShow(history[index + 1]);
 
           rowDiv.appendChild(firstMove);
           rowDiv.appendChild(secondMove);
