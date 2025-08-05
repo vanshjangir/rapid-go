@@ -1,14 +1,14 @@
 package routes
 
 import (
-    "log"
-    "time"
     "database/sql"
+    "log"
     "github.com/gin-gonic/gin"
     "github.com/vanshjangir/rapid-go/server/internal/database"
 )
 
 type RecentGame struct {
+	GameId		string	`json:"gameid"`
     Opponent    string  `json:"opponent"`
     Result      string  `json:"result"`
     Date        string  `json:"date"`
@@ -28,27 +28,23 @@ func Profile(ctx *gin.Context) {
     db := database.ConnectDatabase()
     username := ctx.Query("username")
 
+	var query string
     var data UserProfileData
     data.Name = username
+    
+    query = `
+	SELECT
+	(SELECT rating FROM users WHERE username = $1) AS user_rating,
+	(SELECT highestrating FROM users WHERE username = $1) AS highest_rating,
+	(SELECT COUNT(*) FROM games WHERE (white = $1 AND winner = 0)
+	OR
+	(black = $1 AND winner = 1)) AS games_won,
+	(SELECT COUNT(*) FROM games WHERE white = $1 OR black = $1) AS games_played;
+	`
 
-    query := "SELECT rating, highestrating FROM users WHERE username = $1"
-    if err := db.QueryRow(query, username).Scan(&data.Rating, &data.HighestRating);
-    err == sql.ErrNoRows {
-        log.Println("Error fetching rating highestrating")
-        ctx.JSON(400, gin.H{"error": "username not found"})
-        return
-    }
-    
-    query = "SELECT COUNT(*) FROM games WHERE white = $1 OR black = $1"
-    if err := db.QueryRow(query, username).Scan(&data.GamesPlayed);
-    err == sql.ErrNoRows {
-        log.Println("Error fetching games played")
-        ctx.JSON(400, gin.H{"error": "username not found"})
-        return
-    }
-    
-    query = "SELECT COUNT(*) FROM games WHERE (white = $1 AND winner = 0) OR (black = $1 AND winner = 1)"
-    if err := db.QueryRow(query, username).Scan(&data.Wins);
+    if err := db.QueryRow(query, username).Scan(
+		&data.Rating, &data.HighestRating, &data.Wins, &data.GamesPlayed,
+		);
     err == sql.ErrNoRows {
         log.Println("Error fetching games won")
         ctx.JSON(400, gin.H{"error": "username not found"})
@@ -57,7 +53,13 @@ func Profile(ctx *gin.Context) {
 
     data.Losses = data.GamesPlayed - data.Wins
 
-    query = "SELECT white, black, winner, date FROM games WHERE black = $1 OR white = $1 ORDER BY created_at DESC LIMIT 10"
+    query = `
+	SELECT gameid, white, black, winner, date
+	FROM
+	games
+	WHERE black = $1 OR white = $1
+	ORDER BY created_at DESC LIMIT 10`
+
     if rows, err := db.Query(query, username);
     err != nil {
         log.Println("Error fetching recent games:",err)
@@ -68,10 +70,9 @@ func Profile(ctx *gin.Context) {
             var recentGame RecentGame
             var white string
             var black string
-            var date time.Time
             var winner int
-            rows.Scan(&white, &black, &winner, &date);
-            
+            rows.Scan(&recentGame.GameId, &white, &black, &winner, &recentGame.Date);
+
             if white == username {
                 if winner == 1 {
                     recentGame.Result = "Lost"
@@ -87,11 +88,9 @@ func Profile(ctx *gin.Context) {
                 }
                 recentGame.Opponent = white
             }
-            recentGame.Date = date.String()
             data.RecentGames = append(data.RecentGames, recentGame)
         }
-
     }
-
-    ctx.JSON(200, data)
+    
+	ctx.JSON(200, data)
 }

@@ -2,6 +2,20 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CredentialResponse, GoogleLogin } from "@react-oauth/google";
 import { useGlobalContext } from "../GlobalContext";
+import {
+  Box,
+  Flex,
+  Heading,
+  Text,
+  Input,
+  Button,
+  VStack,
+  FormControl,
+  FormLabel,
+  Link,
+  Divider,
+  HStack
+} from "@chakra-ui/react";
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -9,7 +23,7 @@ const Login: React.FC = () => {
   const [error, setError] = useState("");
   const nav = useNavigate();
   const { setUsername } = useGlobalContext();
-  const httpapi = import.meta.env.VITE_HTTP_URL
+  const httpapi = import.meta.env.VITE_HTTP_URL;
 
   const handleLogin = async () => {
     const response = await fetch(httpapi + '/login', {
@@ -25,7 +39,7 @@ const Login: React.FC = () => {
       }),
     });
 
-    if (response.status === 200){
+    if (response.status === 200) {
       const json = await response.json();
       console.log("Login successful");
       localStorage.setItem("token", json.token);
@@ -40,10 +54,10 @@ const Login: React.FC = () => {
   };
 
   const handleGoogleLogin = async (credentialResponse: CredentialResponse) => {
-    if(!credentialResponse.credential){
+    if (!credentialResponse.credential) {
       setError("Google Login unsuccessful");
       console.log("Google Login unsuccessful");
-      return
+      return;
     }
 
     const response = await fetch(httpapi + '/login', {
@@ -59,7 +73,7 @@ const Login: React.FC = () => {
       }),
     });
 
-    if (response.status === 200){
+    if (response.status === 200) {
       const json = await response.json();
       console.log("Login successful");
       localStorage.setItem("token", json.token);
@@ -71,51 +85,77 @@ const Login: React.FC = () => {
       setError("Google Login unsuccessful");
       console.log("Google Login unsuccessful");
     }
-  }
+  };
 
   return (
-    <div className="h-screen bg-[#222222] text-white flex flex-col">
-      <div className="flex flex-col items-center justify-center flex-1 px-6 py-12 space-y-6">
-        <h1 className="text-3xl font-semibold text-center">Login</h1>
-        {error && <p className="text-red-500">{error}</p>}
-        <div className="w-full max-w-md bg-[#333333] p-8 rounded-lg">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="email" className="text-lg">Email</label>
-              <input
+    <Flex h="100vh" bg="#222222" color="white" direction="column">
+      <Flex
+        direction="column"
+        alignItems="center"
+        justifyContent="center"
+        flex="1"
+        px={6}
+        py={12}
+      >
+        <Heading as="h1" fontSize="3xl" fontWeight="semibold" textAlign="center" mb={6}>
+          Login
+        </Heading>
+        {error && <Text color="red.500" mb={4}>{error}</Text>}
+        <Box w="full" maxW="md" bg="#333333" p={8} borderRadius="lg">
+          <VStack spacing={4}>
+            <FormControl>
+              <FormLabel htmlFor="email" fontSize="lg">Email</FormLabel>
+              <Input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full p-3 bg-[#444444] text-white rounded-lg border border-[#555555] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                p={3}
+                bg="#444444"
+                color="white"
+                borderRadius="lg"
+                border="1px"
+                borderColor="#555555"
+                _focus={{ outline: "none", boxShadow: "0 0 0 2px var(--chakra-colors-blue-500)" }}
                 placeholder="Enter your email"
               />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="password" className="text-lg">Password</label>
-              <input
+            </FormControl>
+            <FormControl>
+              <FormLabel htmlFor="password" fontSize="lg">Password</FormLabel>
+              <Input
                 id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full p-3 bg-[#444444] text-white rounded-lg border border-[#555555] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                p={3}
+                bg="#444444"
+                color="white"
+                borderRadius="lg"
+                border="1px"
+                borderColor="#555555"
+                _focus={{ outline: "none", boxShadow: "0 0 0 2px var(--chakra-colors-blue-500)" }}
                 placeholder="Enter your password"
               />
-            </div>
-            <div className="flex justify-center">
-              <button
+            </FormControl>
+            <Flex justifyContent="center" w="full">
+              <Button
                 onClick={handleLogin}
-                className="w-full py-3 bg-blue-600 rounded-lg hover:bg-blue-500 focus:outline-none focus:ring focus:ring-blue-300"
+                w="full"
+                py={3}
+                bg="blue.600"
+                borderRadius="lg"
+                _hover={{ bg: "blue.500" }}
+                _focus={{ outline: "none", boxShadow: "0 0 0 3px var(--chakra-colors-blue-300)" }}
               >
                 Login
-              </button>
-            </div>
-            <div className="flex items-center my-6">
-              <hr className="flex-grow border-t border-gray-600" />
-              <span className="mx-4 text-gray-400">OR</span>
-              <hr className="flex-grow border-t border-gray-600" />
-            </div>
-            <div className="flex justify-center">
+              </Button>
+            </Flex>
+            <HStack alignItems="center" my={6} w="full">
+              <Divider borderColor="gray.600" flex="1" />
+              <Text mx={4} color="gray.400">OR</Text>
+              <Divider borderColor="gray.600" flex="1" />
+            </HStack>
+            <Flex justifyContent="center">
               <GoogleLogin
                 onSuccess={(credentialResponse) => {
                   handleGoogleLogin(credentialResponse);
@@ -126,14 +166,14 @@ const Login: React.FC = () => {
                 }}
                 useOneTap
               />
-            </div>
-          </div>
-        </div>
-        <div className="text-center text-sm text-gray-400">
-          <p>Don't have an account? <a href="/signup" className="text-blue-400 hover:underline">Sign Up</a></p>
-        </div>
-      </div>
-    </div>
+            </Flex>
+          </VStack>
+        </Box>
+        <Text textAlign="center" fontSize="sm" color="gray.400" mt={6}>
+          Don't have an account? <Link href="/signup" color="blue.400" _hover={{ textDecoration: "underline" }}>Sign Up</Link>
+        </Text>
+      </Flex>
+    </Flex>
   );
 };
 

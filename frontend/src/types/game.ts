@@ -27,8 +27,8 @@ export interface MsgLose {
 
 export interface MsgMoveStatus {
   type: "movestatus";
-  turnStatus: string;
-  moveStatus: string;
+  turnStatus: boolean;
+  moveStatus: boolean;
   move: string;
   state: string;
   selfTime: number;
@@ -80,6 +80,7 @@ export interface UserProfileData {
   losses: number;
   highestRating: number;
   recentGames: {
+    gameid: string;
     opponent: string;
     result: string;
     date: string;

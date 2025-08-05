@@ -27,6 +27,7 @@ func main(){
     r.GET("/againstbot", middleware.WsAuth, routes.ConnectAgainstBot)
     r.GET("/isPending", routes.IsPending)
     r.GET("/profile", routes.Profile)
+	r.GET("/review", routes.Review)
     
     r.POST("/login", routes.Login)
     r.POST("/signup", routes.Signup)

@@ -8,7 +8,7 @@ export const PlayButton = (
   return (
     <button
       onClick={() => handler(gametype)}
-      className="w-[400px] text-4xl font-bold py-6 bg-[#614231] rounded hover:bg-[#715241] focus:outline-none focus:ring hover:shadow-[0_0_20px_5px_#715241]"
+      className="w-[464px] text-4xl font-bold py-6 bg-[#614231] rounded hover:bg-[#715241] focus:outline-none focus:ring hover:shadow-[0_0_20px_5px_#715241]"
     >
       {label}
     </button>

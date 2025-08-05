@@ -6,9 +6,6 @@ import (
     "log"
     "net/http"
     "os"
-    "io"
-    "bytes"
-    "encoding/json"
     "strconv"
     "github.com/gin-gonic/gin"
     "github.com/golang-jwt/jwt/v5"
@@ -122,18 +119,9 @@ func auth(ctx *gin.Context, token string){
 }
 
 func HttpAuth(ctx *gin.Context) {
-    bodyAsByteArray, _ := io.ReadAll(ctx.Request.Body)
-    ctx.Request.Body = io.NopCloser(bytes.NewBuffer(bodyAsByteArray))
-    
-    jsonMap := make(map[string]interface{})
-    if err := json.Unmarshal(bodyAsByteArray, &jsonMap); err != nil {
-        ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON"})
-        ctx.Abort()
-        return
-    }
+	token := ctx.GetHeader("Authorization")
 
-    token, ok := jsonMap["token"].(string)
-    if ok {
+    if token != "" {
         auth(ctx, token);
     } else {
         ctx.JSON(http.StatusUnauthorized,

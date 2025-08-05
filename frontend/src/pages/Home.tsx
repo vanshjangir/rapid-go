@@ -4,6 +4,7 @@ import { useGlobalContext } from "../GlobalContext";
 import { MsgStart } from "../types/game";
 import Navbar from "../components/Navbar";
 import { PlayButton, ReconnectButton } from "../components/Buttons"
+import { Flex, Box, Text, Image, VStack } from "@chakra-ui/react";
 
 const TOKEN_TYPE_GUEST = "3";
 
@@ -96,37 +97,44 @@ const Home = () => {
   }, []);
 
   return (
-    <div className="h-screen bg-[#222222] flex flex-col text-white">
+    <Flex h="100vh" bg="#222222" direction="column" color="white">
       <Navbar />
-      <div className="flex flex-col w-full justify-center items-center lg:flex-row">
-        <div className="hidden lg:inline-flex lg:pt-[200px] mr-8">
-          <img src="/boardbg.png" className="shadow-black w-[400px] rounded"/>
-        </div>
-        <div>
-          <div className="flex flex-col items-center justify-center pt-[224px] space-y-8">
-            <p className="text-5xl font-bold">Online Go!</p>
-            {matchStatus === "pending" ? (
-              <p className="text-lg">Finding an opponent...</p>
-            ) : (
-                <p className="text-lg">
-                  {token ? "Ready to start a game!" : "Login or play as guest"}
-                </p>
+      <Flex
+        direction={{ base: "column", lg: "row" }}
+        w="full"
+        justify="center"
+        align="center"
+      >
+        <Box
+          display={{ base: "none", lg: "inline-flex" }}
+          pt={{ lg: "200px" }}
+          mr={8}
+        >
+          <Image src="/boardbg.png" boxShadow="lg" w="464px" rounded="md" />
+        </Box>
+        <VStack spacing={8} pt={"266px"} align="center">
+          <Text fontSize="5xl" fontWeight="bold">Online Go!</Text>
+          {matchStatus === "pending" ? (
+            <Text fontSize="lg">Finding an opponent...</Text>
+          ) : (
+              <Text fontSize="lg">
+                {token ? "Ready to start a game!" : "Login or play as guest"}
+              </Text>
             )}
-            <PlayButton
-              label={token ? "Play" : "Play as Guest"}
-              gametype="player"
-              handler={play}
-            />
-            <PlayButton
-              label="Against Bot"
-              gametype="bot"
-              handler={play}
-            />
-            {recon === true ? <ReconnectButton handler={reconnect} /> :''}
-          </div>
-        </div>
-      </div>
-    </div>
+          <PlayButton
+            label={token ? "Play" : "Play as Guest"}
+            gametype="player"
+            handler={play}
+          />
+          <PlayButton
+            label="Against Bot"
+            gametype="bot"
+            handler={play}
+          />
+          {recon === true && <ReconnectButton handler={reconnect} />}
+        </VStack>
+      </Flex>
+    </Flex>
   );
 };
 
