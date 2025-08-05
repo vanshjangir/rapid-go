@@ -16,8 +16,8 @@ tmux send-keys -t 'editor' C-m "nvim" C-m
 tmux new-window -t $SESSION_NAME:2 -n 'server'
 tmux send-keys -t 'server' "cd server" C-m "go run ." C-m
 
-tmux new-window -t $SESSION_NAME:3 -n 'webclient'
-tmux send-keys -t 'webclient' "cd webclient" C-m "npm run dev" C-m
+tmux new-window -t $SESSION_NAME:3 -n 'frontend'
+tmux send-keys -t 'frontend' "cd frontend" C-m "npm run dev" C-m
 
 tmux select-window -t $SESSION_NAME:1
 tmux attach -t $SESSION_NAME

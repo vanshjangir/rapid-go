@@ -16,7 +16,7 @@ services:
   client:
     image: rg_client
     build:
-      context: ./webclient/
+      context: ./frontend/
       args:
         - ENV_FILE=.env.production
     ports:
