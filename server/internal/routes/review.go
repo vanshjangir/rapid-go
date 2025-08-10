@@ -1,22 +1,22 @@
 package routes
 
 import (
-    "database/sql"
-    "github.com/gin-gonic/gin"
-    "github.com/vanshjangir/rapid-go/server/internal/database"
+	"database/sql"
+	"github.com/gin-gonic/gin"
+	"github.com/vanshjangir/rapid-go/server/internal/database"
 )
 
 type ReviewReqData struct {
-    GameId string `json:"gameid"`
+	GameId string `json:"gameid"`
 }
 
 func Review(ctx *gin.Context) {
-	db := database.ConnectDatabase()
-    gameid := ctx.Query("gameid")
-	
+	db := database.GetDatabase()
+	gameid := ctx.Query("gameid")
+
 	var moves string
 	query := "SELECT moves FROM games WHERE gameid = $1"
-	
+
 	err := db.QueryRow(query, gameid).Scan(&moves)
 	if err != nil {
 		if err == sql.ErrNoRows {

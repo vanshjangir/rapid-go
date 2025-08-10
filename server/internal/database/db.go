@@ -1,34 +1,34 @@
 package database
 
 import (
-    "os"
-    "log"
-    "sync"
-    "database/sql"
+	"database/sql"
+	"log"
+	"os"
+	"sync"
 )
 
-var(
-    db *sql.DB
-    once sync.Once
+var (
+	db   *sql.DB
+	once sync.Once
 )
 
-func ConnectDatabase () *sql.DB {
-    once.Do( func() {
-        connection_uri := os.Getenv("POSTGRES_URI")
+func GetDatabase() *sql.DB {
+	once.Do(func() {
+		connection_uri := os.Getenv("POSTGRES_URI")
 
-        var err error
-        db, err = sql.Open("postgres", connection_uri)
-        if err != nil {
-            panic(err)
-        }
-        
-        err = db.Ping()
-        if err != nil {
-            panic(err)
-        }
+		var err error
+		db, err = sql.Open("postgres", connection_uri)
+		if err != nil {
+			panic(err)
+		}
 
-        log.Println("Successfully connected to postgres")
-    })
+		err = db.Ping()
+		if err != nil {
+			panic(err)
+		}
 
-    return db
+		log.Println("Successfully connected to postgres")
+	})
+
+	return db
 }

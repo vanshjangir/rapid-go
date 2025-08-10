@@ -58,7 +58,10 @@ export const GlobalProvider: React.FC<GlobalProps> = ({ children }) => {
 
 
   return (
-    <globalCtx.Provider value={{connect, getSocket, destSocket, player, isLoggedIn, username, setUsername}}>
+    <globalCtx.Provider value={{
+      connect, getSocket, destSocket, player,
+      isLoggedIn, username, setUsername
+    }}>
       {children}
     </globalCtx.Provider>
   )

@@ -13,10 +13,13 @@ tmux new-session -d -s $SESSION_NAME
 tmux rename-window -t $SESSION_NAME:1 'editor'
 tmux send-keys -t 'editor' C-m "nvim" C-m
 
-tmux new-window -t $SESSION_NAME:2 -n 'server'
-tmux send-keys -t 'server' "cd server" C-m "go run ." C-m
+tmux new-window -t $SESSION_NAME:2 -n 'backend'
+tmux send-keys -t 'backend' "cd server/cmd/backend" C-m "go run ." C-m
 
-tmux new-window -t $SESSION_NAME:3 -n 'frontend'
+tmux new-window -t $SESSION_NAME:3 -n 'websocket'
+tmux send-keys -t 'websocket' "cd server/cmd/websocket" C-m "go run ." C-m
+
+tmux new-window -t $SESSION_NAME:4 -n 'frontend'
 tmux send-keys -t 'frontend' "cd frontend" C-m "npm run dev" C-m
 
 tmux select-window -t $SESSION_NAME:1

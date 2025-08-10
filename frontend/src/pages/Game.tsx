@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useGlobalContext } from "../GlobalContext";
-import { ChatMessage, MsgChat, MsgLose, MsgMove, MsgMoveStatus, MsgSync, MsgWin } from "../types/game";
+import { ChatMessage, MsgChat, MsgMove, MsgMoveStatus, MsgSync, MsgGameover } from "../types/game";
 import { GameState } from "../types/game";
 import Navbar from "../components/Navbar";
 import { Inflate } from "pako";
@@ -146,7 +146,7 @@ const Game: React.FC = () => {
   };
 
   const handleSocketRecv = async (data: any) => {
-    const msg: MsgMove | MsgMoveStatus | MsgSync | MsgWin | MsgLose | MsgChat =
+    const msg: MsgMove | MsgMoveStatus | MsgSync | MsgGameover | MsgChat =
       await JSON.parse(data);
     console.log("MoveStatus", msg);
     switch (msg.type) {
@@ -212,22 +212,12 @@ const Game: React.FC = () => {
         }
         break;
 
-      case "win":
+      case "gameover":
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
         }
-        showEndMessage("You Won");
+        showEndMessage(msg.winner === gameStateRef.current?.color ? "You won" : "You lost");
         destSocket();
-        console.log("You Won!!");
-        break;
-
-      case "lose":
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-        }
-        showEndMessage("You Lost");
-        destSocket();
-        console.log("You Lost :(");
         break;
 
       case "chat":
@@ -349,7 +339,10 @@ const Game: React.FC = () => {
         const textDiv = document.createElement("div");
         textDiv.className = "text-white flex flex-row w-full";
         textDiv.textContent = messages.current[index].text;
-        textDiv.className = `px-2 rounded-lg text-wrap break-all ${messages.current[index].type === 'sent' ? 'text-blue-500 self-end' : 'text-gray-500 self-start'}`;
+        textDiv.className = `px-2 rounded-lg text-wrap break-all
+        ${messages.current[index].type === 'sent' ?
+        'text-blue-500 self-end' : 'text-gray-500 self-start'
+        }`;
 
         if (chatRef.current) {
           chatRef.current.appendChild(textDiv);
@@ -425,7 +418,7 @@ const Game: React.FC = () => {
           <canvas
             ref={canvasRef}
             id="canvas"
-            className="bg-yellow-200"
+            className="bg-yellow-200 rounded-lg"
             width={gridSize + 2 * cellSize}
             height={gridSize + 2 * cellSize}
           ></canvas>

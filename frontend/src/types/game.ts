@@ -17,12 +17,10 @@ export interface MsgAbort {
   type: string;
 }
 
-export interface MsgWin {
-  type: "win";
-}
-
-export interface MsgLose {
-  type: "lose";
+export interface MsgGameover {
+  type: "gameover";
+  winner: number;
+  message: string;
 }
 
 export interface MsgMoveStatus {
