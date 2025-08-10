@@ -130,7 +130,6 @@ func reconnect(username string, c *websocket.Conn) bool {
 	game.Player.Wsc.WriteJSON(core.StartMsg{Start: 1, Color: 1, GameId: game.Id})
 	go core.PlayGame(game)
 
-	c.WriteMessage(websocket.TextMessage, []byte("reconnected"))
 	log.Println("Player reconnected", username)
 	return true
 }
@@ -215,13 +214,17 @@ func ConnectPlayer(ctx *gin.Context) {
 	if gameType == "reconnect" {
 		if recType == "player" {
 			if ok := reconnect(username, c); !ok {
-				c.WriteMessage(websocket.TextMessage,
-					[]byte("Error in reconnecting"))
+				c.WriteMessage(
+					websocket.TextMessage,
+					[]byte("Error in reconnecting"),
+				)
 			}
 		} else {
 			if ok := reconnectBot(username, c); !ok {
-				c.WriteMessage(websocket.TextMessage,
-					[]byte("Error in reconnecting"))
+				c.WriteMessage(
+					websocket.TextMessage,
+					[]byte("Error in reconnecting"),
+				)
 			}
 		}
 		return

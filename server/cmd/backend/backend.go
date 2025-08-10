@@ -32,8 +32,6 @@ func main() {
 
 	r.GET("/profile", routes.Profile)
 	r.GET("/review", routes.Review)
-	r.GET("/getwsurl", middleware.HttpAuth, routes.GetWsUrl)
-	r.GET("/isPending", middleware.HttpAuth, routes.IsPending)
 	r.GET("/findgame", middleware.HttpAuth, routes.FindGame)
 
 	r.POST("/login", routes.Login)

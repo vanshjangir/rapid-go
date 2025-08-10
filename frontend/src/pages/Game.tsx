@@ -136,13 +136,7 @@ const Game: React.FC = () => {
 
   const handleAbort = () => {
     const socket = socketRef.current;
-    if (socket) {
-      socket.send(
-        JSON.stringify({
-          type: "abort"
-        })
-      );
-    }
+    if (socket) socket.send(JSON.stringify({type: "abort"}));
   };
 
   const handleSocketRecv = async (data: any) => {

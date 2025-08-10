@@ -85,7 +85,7 @@ func updateRating(g *Game, winner int) error {
 
 func handleChat(g *Game, msgBytes []byte) error {
 	jsonData := make(map[string]any)
-	if err := json.Unmarshal(msgBytes, jsonData); err != nil {
+	if err := json.Unmarshal(msgBytes, &jsonData); err != nil {
 		log.Println("Error unmarshaling chat message", err)
 		return err
 	}
@@ -141,6 +141,7 @@ func handleGameOver(g *Game, winner int, wonby string) {
 		log.Println("Error saving game state:", err)
 	}
 
+	delete(Pmap, g.Player.Username)
 	close(g.Over)
 }
 
@@ -303,11 +304,13 @@ func handleGameOverPubsub(g *Game, msgBytes []byte) {
 		log.Println("Error saving game state:", err)
 	}
 
+	delete(Pmap, g.Player.Username)
 	close(g.Over)
 }
 
 func PubsubRecv(g *Game) {
 	ps := pubsub.Rdb.Subscribe(pubsub.RdbCtx, g.Id)
+	g.Player.Ps = ps
 	defer ps.Close()
 
 	_, err := ps.Receive(pubsub.RdbCtx)
@@ -316,6 +319,7 @@ func PubsubRecv(g *Game) {
 	}
 
 	ch := ps.Channel()
+RecvLoop:
 	for msg := range ch {
 		var pubsubMsg pubsub.PubsubMsg
 		if err := json.Unmarshal([]byte(msg.Payload), &pubsubMsg); err != nil {
@@ -336,20 +340,28 @@ func PubsubRecv(g *Game) {
 
 		case "gameover":
 			handleGameOverPubsub(g, pubsubMsg.Data)
+			break RecvLoop
 		}
+	}
+
+	if err := ps.Unsubscribe(pubsub.RdbCtx, g.Id); err != nil {
+		log.Println("Error Unsubscribing to channel")
 	}
 }
 
 func PlayGame(g *Game) {
 	go PubsubRecv(g)
 	defer g.Player.Wsc.Close()
-
 	for {
 		if err := handleRecv(g); err != nil {
 			log.Println(err)
 		}
 
 		if g.Player.DisConn {
+			log.Println("Player diconnected")
+			if err := g.Player.Ps.Unsubscribe(pubsub.RdbCtx, g.Id); err != nil {
+				log.Println("Error Unsubscribing to channel")
+			}
 			break
 		}
 	}

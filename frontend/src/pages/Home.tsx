@@ -10,7 +10,7 @@ const TOKEN_TYPE_GUEST = "3";
 
 const Home = () => {
   const nav = useNavigate();
-  const { connect, player, destSocket } = useGlobalContext();
+  const { connect, player, getSocket, destSocket } = useGlobalContext();
   const [matchStatus, setMatchStatus] = useState("");
   const [recon, setRecon] = useState(false);
   const token = localStorage.getItem("token") || "";
@@ -24,27 +24,11 @@ const Home = () => {
     }
   }
 
-  const getWsUrl = async (): Promise<string> => {
-    const response = await fetch(httpapi + "/getwsurl", {
-      headers: {
-        "Authorization": token,
-      }
-    });
-
-    const json = await response.json();
-    if (response.status === 200) {
-      return json.url;
-    } else {
-      console.log("Error")
-      return "";
-    }
-  }
-
-  const connectToGame = (wsapi: string, token: string, how: string) => {
+  const connectToGame = (wsurl: string, token: string, how: string) => {
     const uri = (how === "bot" ? "/againstbot" : "/game")
       + "?type=new&token=" + token;
     
-    const socket = connect(wsapi + uri);
+    const socket = connect(wsurl + uri);
     localStorage.setItem("rectype", how);
 
     socket.onmessage = async (event: MessageEvent) => {
@@ -60,6 +44,7 @@ const Home = () => {
   }
 
   const findGame = async (token: string, how: string) => {
+    setMatchStatus("Finding game ...");
     const response = await fetch(httpapi + "/findgame", {
       headers: {
         "Authorization": token,
@@ -67,27 +52,34 @@ const Home = () => {
     });
     const json = await response.json();
     if (response.status === 200) {
-      const wsapi = json.wsurl;
-      console.log("wsapi", wsapi);
-      connectToGame(wsapi, token, how);
+      const wsurl = json.wsurl;
+      localStorage.setItem('wsurl', wsurl);
+      connectToGame("ws://" + wsurl, token, how);
     } else {
       console.log(`Error occured while finding a game ${json}`);
     }
   };
 
   const reconnect = async () => {
-    const wsapi = await getWsUrl();
-    const rectype = localStorage.getItem("rectype") ?
-      localStorage.getItem("rectype") : "player" ;
-    
-    const socket = connect(wsapi +
-      `/game?type=reconnect&rectype=${rectype}&token=${token}`);
+    const wsurl = localStorage.getItem('wsurl');
+    if (!wsurl) return;
 
+    if (getSocket()) {
+      const currentPath = window.location.pathname;
+      if (!currentPath.includes(`/game/${player.gameId}`)) {
+        nav(`/game/${player.gameId}`);
+      }
+      return;
+    }
+
+    const rectype = localStorage.getItem("rectype") || "player" ;
+    const socket = connect(
+      "ws://" + wsurl + `/game?type=reconnect&rectype=${rectype}&token=${token}`
+    );
     socket.onmessage = async (event: MessageEvent) => {
       const json: MsgStart = await JSON.parse(event.data);
       player.color = json.color;
       player.gameId = json.gameId;
-      console.log(json);
 
       const currentPath = window.location.pathname;
       if (!currentPath.includes(`/game/${json.gameId}`)) {
@@ -100,7 +92,10 @@ const Home = () => {
     const username = localStorage.getItem("username");
     if (!username) return;
 
-    const response = await fetch(httpapi + `/isPending?username=${username}`, {
+    const wsurl = localStorage.getItem('wsurl');
+    if (!wsurl) return;
+
+    const response = await fetch("http://" + wsurl + `/ispending?username=${username}`, {
       method: "GET",
       headers: {
         "Authorization": token,

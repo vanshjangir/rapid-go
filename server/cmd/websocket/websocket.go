@@ -39,6 +39,8 @@ func main() {
 	r.GET("/game", middleware.WsAuth, routes.ConnectPlayer)
 	r.GET("/againstbot", middleware.WsAuth, routes.ConnectAgainstBot)
 
+	r.GET("/ispending", middleware.HttpAuth, routes.IsPending)
+
 	if err := godotenv.Load("../../.env"); err != nil {
 		log.Fatal("Error loading env variables: ", err)
 		return

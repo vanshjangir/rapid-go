@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/vanshjangir/baduk"
@@ -33,6 +34,7 @@ type Player struct {
 	Rating      int
 	Game        *Game
 	Wsc         *websocket.Conn
+	Ps          *redis.PubSub
 }
 
 type Clock struct {

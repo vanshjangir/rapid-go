@@ -46,6 +46,9 @@ export const GlobalProvider: React.FC<GlobalProps> = ({ children }) => {
   };
 
   const destSocket = () => {
+    if (socketRef.current) {
+      socketRef.current.close();
+    }
     socketRef.current = null;
   };
 
