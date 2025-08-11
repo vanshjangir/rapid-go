@@ -33,6 +33,7 @@ func main() {
 	r.GET("/profile", routes.Profile)
 	r.GET("/review", routes.Review)
 	r.GET("/findgame", middleware.HttpAuth, routes.FindGame)
+	r.GET("/getwsurl", middleware.HttpAuth, routes.GetWsurl)
 
 	r.POST("/login", routes.Login)
 	r.POST("/signup", routes.Signup)

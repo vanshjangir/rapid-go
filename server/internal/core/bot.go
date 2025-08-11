@@ -255,6 +255,7 @@ func PlayGameBot(g *Game) {
 		}
 
 		if g.Player.DisConn {
+			log.Println("Player diconnected")
 			break
 		}
 	}

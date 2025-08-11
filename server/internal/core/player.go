@@ -117,6 +117,14 @@ func handleSyncState(g *Game) {
 	}
 }
 
+func deleteFromRedis(g *Game) {
+	hashKey := "live_game"
+	err := pubsub.Rdb.HDel(pubsub.RdbCtx, hashKey, g.Player.Username).Err()
+	if err != nil {
+		log.Println("Error deleting player name from redis Hashmap:", err)
+	}
+}
+
 func handleGameOver(g *Game, winner int, wonby string) {
 	var gameOverMsg GameOverMsg
 	gameOverMsg.Type = "gameover"
@@ -142,6 +150,7 @@ func handleGameOver(g *Game, winner int, wonby string) {
 	}
 
 	delete(Pmap, g.Player.Username)
+	deleteFromRedis(g)
 	close(g.Over)
 }
 
@@ -305,6 +314,7 @@ func handleGameOverPubsub(g *Game, msgBytes []byte) {
 	}
 
 	delete(Pmap, g.Player.Username)
+	deleteFromRedis(g)
 	close(g.Over)
 }
 

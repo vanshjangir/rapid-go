@@ -16,11 +16,22 @@ const Home = () => {
   const token = localStorage.getItem("token") || "";
   const httpapi = import.meta.env.VITE_HTTP_URL
 
-  const play = (how: string) => {
-    if (token) {
-      findGame(token, how);
+  const getWsurl = async (authtoken: string) => {
+    const response = await fetch(httpapi + "/getwsurl", {
+      headers: { Authorization : authtoken }
+    });
+
+    const json = await response.json();
+    return json.wsurl || "";
+  }
+
+  const play = async (how: string) => {
+    const authtoken = token || TOKEN_TYPE_GUEST;
+    if (how === "bot") {
+      const wsurl = await getWsurl(authtoken);
+      connectToGame("ws://" + wsurl, authtoken, how);
     } else {
-      findGame(TOKEN_TYPE_GUEST, how);
+      findGame(authtoken, how);
     }
   }
 
@@ -73,9 +84,11 @@ const Home = () => {
     }
 
     const rectype = localStorage.getItem("rectype") || "player" ;
+    const gameType = (rectype === "player" ? "game" : "againstbot");
     const socket = connect(
-      "ws://" + wsurl + `/game?type=reconnect&rectype=${rectype}&token=${token}`
+      `ws://${wsurl}/${gameType}?type=reconnect&token=${token}`
     );
+
     socket.onmessage = async (event: MessageEvent) => {
       const json: MsgStart = await JSON.parse(event.data);
       player.color = json.color;

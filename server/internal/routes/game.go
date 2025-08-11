@@ -45,6 +45,15 @@ func getRating(username string) int {
 	return rating
 }
 
+func addBotEntry(g *core.Game) error {
+	db := database.GetDatabase()
+	updateQuery := `UPDATE games SET white = $2 WHERE gameid = $1`
+	if _, err := db.Exec(updateQuery, g.Id, "bot"); err != nil {
+		return err
+	}
+	return nil
+}
+
 func addGame(g *core.Game) error {
 	player := "white"
 	if g.Player.Color == core.BlackCell {
@@ -88,11 +97,9 @@ func startGame(g *core.Game) {
 
 	g.InitGame()
 	g.Player.Rating = getRating(g.Player.Username)
-	g.Player.Wsc.WriteJSON(core.StartMsg{
-		Start:  1,
-		Color:  g.Player.Color,
-		GameId: g.Id,
-	})
+	g.Player.Wsc.WriteJSON(
+		core.StartMsg{Start: 1, Color: g.Player.Color, GameId: g.Id},
+	)
 
 	core.Pmap[g.Player.Username] = g
 	g.Over = make(chan bool)
@@ -100,35 +107,47 @@ func startGame(g *core.Game) {
 		log.Println("Error occurred in adding Game data:", err)
 		return
 	}
+
 	go core.PlayGame(g)
 	go core.MonitorTimeout(g)
 }
 
-func startBotGame(game *core.Game) {
+func startGameBot(g *core.Game) {
 	log.Println("New match has started")
 
-	game.InitGame()
-	game.Player.Rating = getRating(game.Player.Username)
-	game.Player.Wsc.WriteJSON(
-		core.StartMsg{Start: 1, Color: 1, GameId: game.Id},
+	g.InitGame()
+	g.Player.Rating = getRating(g.Player.Username)
+	g.Player.Wsc.WriteJSON(
+		core.StartMsg{Start: 1, Color: 1, GameId: g.Id},
 	)
 
-	core.Pmap[game.Player.Username] = game
+	core.Pmap[g.Player.Username] = g
+	g.Over = make(chan bool)
+	if err := addGame(g); err != nil {
+		log.Println("Error occurred in adding Game data:", err)
+		return
+	}
 
-	game.Over = make(chan bool)
-	go core.PlayGameBot(game)
+	if err := addBotEntry(g); err != nil {
+		log.Println("Error occurred in adding Bot Entry:", err)
+		return
+	}
+
+	go core.PlayGameBot(g)
 }
 
 func reconnect(username string, c *websocket.Conn) bool {
-	game, ok := core.Pmap[username]
-	if !ok || game == nil {
+	g, ok := core.Pmap[username]
+	if !ok || g == nil {
 		return false
 	}
 
-	game.Player.DisConn = false
-	game.Player.Wsc = c
-	game.Player.Wsc.WriteJSON(core.StartMsg{Start: 1, Color: 1, GameId: game.Id})
-	go core.PlayGame(game)
+	g.Player.DisConn = false
+	g.Player.Wsc = c
+	g.Player.Wsc.WriteJSON(
+		core.StartMsg{Start: 1, Color: g.Player.Color, GameId: g.Id},
+	)
+	go core.PlayGame(g)
 
 	log.Println("Player reconnected", username)
 	return true
@@ -142,10 +161,11 @@ func reconnectBot(username string, c *websocket.Conn) bool {
 
 	game.Player.DisConn = false
 	game.Player.Wsc = c
-	game.Player.Wsc.WriteJSON(core.StartMsg{Start: 1, Color: 1, GameId: game.Id})
+	game.Player.Wsc.WriteJSON(
+		core.StartMsg{Start: 1, Color: core.BlackCell, GameId: game.Id},
+	)
 	go core.PlayGameBot(game)
 
-	c.WriteMessage(websocket.TextMessage, []byte("reconnected"))
 	log.Println("Player reconnected", username)
 	return true
 }
@@ -180,8 +200,8 @@ func getPlayerGame(username string) (string, error) {
 	return gameID, nil
 }
 
-func setupGame(game *core.Game) {
-	if jsondata, err := getPlayerGame(game.Player.Username); err != nil {
+func setupGame(g *core.Game) {
+	if jsondata, err := getPlayerGame(g.Player.Username); err != nil {
 		log.Println("Error getting player game", err)
 		return
 	} else {
@@ -190,16 +210,21 @@ func setupGame(game *core.Game) {
 			log.Println("Error in Unmarshalling json for setupGame: ", err)
 			return
 		}
-		game.Id = gameData["gameId"].(string)
-		game.Player.Color = int(gameData["color"].(float64))
-		startGame(game)
+		g.Id = gameData["gameId"].(string)
+		g.Player.Color = int(gameData["color"].(float64))
+		startGame(g)
 	}
+}
+
+func setupGameBot(g *core.Game) {
+	g.Id = core.GetUniqueId()
+	g.Player.Color = core.BlackCell
+	startGameBot(g)
 }
 
 func ConnectPlayer(ctx *gin.Context) {
 	w, r := ctx.Writer, ctx.Request
 	gameType := ctx.Query("type")
-	recType := ctx.Query("rectype")
 	username := getUsername(ctx)
 	if len(username) == 0 {
 		return
@@ -212,20 +237,11 @@ func ConnectPlayer(ctx *gin.Context) {
 	}
 
 	if gameType == "reconnect" {
-		if recType == "player" {
-			if ok := reconnect(username, c); !ok {
-				c.WriteMessage(
-					websocket.TextMessage,
-					[]byte("Error in reconnecting"),
-				)
-			}
-		} else {
-			if ok := reconnectBot(username, c); !ok {
-				c.WriteMessage(
-					websocket.TextMessage,
-					[]byte("Error in reconnecting"),
-				)
-			}
+		if ok := reconnect(username, c); !ok {
+			c.WriteMessage(
+				websocket.TextMessage,
+				[]byte("Error in reconnecting"),
+			)
 		}
 		return
 	}
@@ -241,6 +257,7 @@ func ConnectPlayer(ctx *gin.Context) {
 
 func ConnectAgainstBot(ctx *gin.Context) {
 	w, r := ctx.Writer, ctx.Request
+	gameType := ctx.Query("type")
 	username := getUsername(ctx)
 	if len(username) == 0 {
 		return
@@ -252,11 +269,21 @@ func ConnectAgainstBot(ctx *gin.Context) {
 		return
 	}
 
-	game := new(core.Game)
-	game.Player = new(core.Player)
-	game.Player.Game = game
+	if gameType == "reconnect" {
+		if ok := reconnectBot(username, c); !ok {
+			c.WriteMessage(
+				websocket.TextMessage,
+				[]byte("Error in reconnecting"),
+			)
+		}
+		return
+	}
 
-	game.Player.Username = username
-	game.Player.Wsc = c
-	startBotGame(game)
+	g := new(core.Game)
+	g.Player = new(core.Player)
+	g.Player.Game = g
+	g.Player.Username = username
+	g.Player.Wsc = c
+
+	setupGameBot(g)
 }
