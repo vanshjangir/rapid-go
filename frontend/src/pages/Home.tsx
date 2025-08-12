@@ -1,18 +1,17 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGlobalContext } from "../GlobalContext";
 import { MsgStart } from "../types/game";
 import Navbar from "../components/Navbar";
-import { PlayButton, ReconnectButton } from "../components/Buttons"
-import { Flex, Box, Text, Image, VStack } from "@chakra-ui/react";
+import { PlayButton } from "../components/Buttons"
+import { Flex, Box, Text, Image, VStack, HStack, Container } from "@chakra-ui/react";
 
 const TOKEN_TYPE_GUEST = "3";
 
 const Home = () => {
   const nav = useNavigate();
-  const { connect, player, getSocket, destSocket } = useGlobalContext();
+  const { connect, player, destSocket } = useGlobalContext();
   const [matchStatus, setMatchStatus] = useState("");
-  const [recon, setRecon] = useState(false);
   const token = localStorage.getItem("token") || "";
   const httpapi = import.meta.env.VITE_HTTP_URL
 
@@ -55,7 +54,7 @@ const Home = () => {
   }
 
   const findGame = async (token: string, how: string) => {
-    setMatchStatus("Finding game ...");
+    setMatchStatus("pending");
     const response = await fetch(httpapi + "/findgame", {
       headers: {
         "Authorization": token,
@@ -70,105 +69,218 @@ const Home = () => {
       console.log(`Error occured while finding a game ${json}`);
     }
   };
-
-  const reconnect = async () => {
-    const wsurl = localStorage.getItem('wsurl');
-    if (!wsurl) return;
-
-    if (getSocket()) {
-      const currentPath = window.location.pathname;
-      if (!currentPath.includes(`/game/${player.gameId}`)) {
-        nav(`/game/${player.gameId}`);
-      }
-      return;
-    }
-
-    const rectype = localStorage.getItem("rectype") || "player" ;
-    const gameType = (rectype === "player" ? "game" : "againstbot");
-    const socket = connect(
-      `ws://${wsurl}/${gameType}?type=reconnect&token=${token}`
-    );
-
-    socket.onmessage = async (event: MessageEvent) => {
-      const json: MsgStart = await JSON.parse(event.data);
-      player.color = json.color;
-      player.gameId = json.gameId;
-
-      const currentPath = window.location.pathname;
-      if (!currentPath.includes(`/game/${json.gameId}`)) {
-        nav(`/game/${json.gameId}`);
-      }
-    };
-  };
-
-  const checkOngoing = async () => {
-    const username = localStorage.getItem("username");
-    if (!username) return;
-
-    const wsurl = localStorage.getItem('wsurl');
-    if (!wsurl) return;
-
-    const response = await fetch("http://" + wsurl + `/ispending?username=${username}`, {
-      method: "GET",
-      headers: {
-        "Authorization": token,
-      },
-    });
-
-    if (response.status === 200) {
-      const json:{status: string}  = await response.json();
-      if (json.status === "present") {
-        setRecon(true);
-      } else {
-        setRecon(false);
-      }
-    }
-  }
   
-
   useEffect(() => {
     destSocket();
-    checkOngoing();
   }, []);
 
   return (
-    <Flex h="100vh" bg="#222222" direction="column" color="white">
+    <Flex 
+      minH="100vh" 
+      bg="linear-gradient(135deg, #1a202c 0%, #2d3748 25%, #4a5568 50%, #2d3748 75%, #1a202c 100%)"
+      direction="column" 
+      color="white"
+      position="relative"
+      overflow="hidden"
+    >
+      <Box
+        position="absolute"
+        top="0"
+        left="0"
+        right="0"
+        bottom="0"
+        opacity="0.05"
+        backgroundSize="100px 100px"
+      />
+      
       <Navbar />
-      <Flex
-        direction={{ base: "column", lg: "row" }}
-        w="full"
-        justify="center"
-        align="center"
-      >
-        <Box
-          display={{ base: "none", lg: "inline-flex" }}
-          pt={{ lg: "200px" }}
-          mr={8}
+      <Container maxW="1300px" flex="1" mt={"160px"} py={6}>
+        <HStack 
+          justifyContent="center" 
+          spacing={{ base: 0, lg: 0 }} 
+          alignItems="center" 
+          w="full" 
+          h="full"
         >
-          <Image src="/boardbg.png" boxShadow="lg" w="464px" rounded="md" />
-        </Box>
-        <VStack spacing={8} pt={"266px"} align="center">
-          <Text fontSize="5xl" fontWeight="bold">Online Go!</Text>
-          {matchStatus === "pending" ? (
-            <Text fontSize="lg">Finding an opponent...</Text>
-          ) : (
-              <Text fontSize="lg">
-                {token ? "Ready to start a game!" : "Login or play as guest"}
-              </Text>
-            )}
-          <PlayButton
-            label={token ? "Play" : "Play as Guest"}
-            gametype="player"
-            handler={play}
-          />
-          <PlayButton
-            label="Against Bot"
-            gametype="bot"
-            handler={play}
-          />
-          {recon === true && <ReconnectButton handler={reconnect} />}
-        </VStack>
-      </Flex>
+          {/* Board Section */}
+          <Box display={{ base: "none", lg: "block" }}
+            h={{ base: "auto", lg: "542px" }} 
+            w={{ base: "auto", lg: "542px" }} 
+          >
+            <Box position="relative">
+              <Image 
+                src="/boardbg.png" 
+                boxShadow="0 20px 40px rgba(0, 0, 0, 0.4)" 
+                w="542px"
+                h="542px"
+                rounded="xl"
+                transition="all 0.3s ease"
+                _hover={{
+                  transform: "translateY(-2px)",
+                  boxShadow: "0 25px 50px rgba(0, 0, 0, 0.5)"
+                }}
+              />
+            </Box>
+          </Box>
+
+          {/* Game Options Section */}
+          <VStack 
+            spacing={8} 
+            align="center" 
+            justify="center" 
+            h={{ base: "auto", lg: "542px" }} 
+            w={{ base: "auto", lg: "542px" }} 
+          >
+            {/* Title Section */}
+            <VStack spacing={4} textAlign="center">
+              <Box position="relative">
+                <Text 
+                  fontSize={{ base: "4xl", md: "5xl", lg: "6xl" }} 
+                  fontWeight="900"
+                  bgGradient="linear(to-r, #f6ad55, #ed8936, #dd6b20)"
+                  bgClip="text"
+                  letterSpacing="tight"
+                  textShadow="0 0 20px rgba(237, 137, 54, 0.3)"
+                  mb={2}
+                >
+                  Online Go
+                </Text>
+                <Box
+                  position="absolute"
+                  bottom="-8px"
+                  left="50%"
+                  transform="translateX(-50%)"
+                  w="80px"
+                  h="4px"
+                  bg="linear-gradient(90deg, #f6ad55, #ed8936)"
+                  rounded="full"
+                />
+              </Box>
+            </VStack>
+
+            {/* Quick Stats */}
+            <HStack 
+              spacing={6} 
+              pt={4}
+              divider={
+                <Box w="1px" h="30px" bg="whiteAlpha.300" />
+              }
+            >
+              <VStack spacing={1}>
+                <Text fontSize="xl" fontWeight="bold" color="orange.300">
+                  24/7
+                </Text>
+                <Text fontSize="sm" color="gray.400">
+                  Online
+                </Text>
+              </VStack>
+              <VStack spacing={1}>
+                <Text fontSize="xl" fontWeight="bold" color="blue.300">
+                  Fast
+                </Text>
+                <Text fontSize="sm" color="gray.400">
+                  Matchmaking
+                </Text>
+              </VStack>
+              <VStack spacing={1}>
+                <Text fontSize="xl" fontWeight="bold" color="green.300">
+                  Free
+                </Text>
+                <Text fontSize="sm" color="gray.400">
+                  Forever
+                </Text>
+              </VStack>
+            </HStack>
+
+            {/* Status Box */}
+            <Box
+              bg="linear-gradient(135deg, rgba(26, 32, 44, 0.9), rgba(45, 55, 72, 0.8))"
+              backdropFilter="blur(12px)"
+              rounded="2xl"
+              p={6}
+              border="2px solid"
+              borderColor="whiteAlpha.200"
+              boxShadow="0 8px 32px rgba(0, 0, 0, 0.3)"
+              w="full"
+              maxW="400px"
+            >
+              {/* Gradient overlay */}
+              <Box
+                position="absolute"
+                top="0"
+                left="0"
+                right="0"
+                bg="linear-gradient(90deg, #f6ad55, #ed8936, #dd6b20, #c05621)"
+              />
+
+              {matchStatus === "pending" ? (
+                <VStack spacing={4}>
+                  <HStack spacing={2} justify="center">
+                    <Box
+                      w="12px"
+                      h="12px"
+                      bg="orange.400"
+                      borderRadius="full"
+                    />
+                    <Box
+                      w="12px"
+                      h="12px"
+                      bg="orange.300"
+                      borderRadius="full"
+                    />
+                    <Box
+                      w="12px"
+                      h="12px"
+                      bg="orange.200"
+                      borderRadius="full"
+                    />
+                  </HStack>
+                  <Text 
+                    fontSize="xl" 
+                    color="orange.200"
+                    fontWeight="600"
+                    textAlign="center"
+                  >
+                    Finding worthy opponent...
+                  </Text>
+                </VStack>
+              ) : (
+                  <VStack spacing={3}>
+                    <Box
+                      w="8px"
+                      h="8px"
+                      bg="green.400"
+                      borderRadius="full"
+                      boxShadow="0 0 10px rgba(72, 187, 120, 0.6)"
+                    />
+                    <Text 
+                      fontSize="lg"
+                      color="gray.200"
+                      fontWeight="600"
+                      textAlign="center"
+                    >
+                      {token ? "Ready for battle!" : "Join as guest or login"}
+                    </Text>
+                  </VStack>
+                )}
+            </Box>
+
+            {/* Game Buttons */}
+            <VStack spacing={5} w="full" maxW="400px">
+              <PlayButton
+                label={token ? "Play Online" : "Play as Guest"}
+                gametype="player"
+                handler={play}
+              />
+              <PlayButton
+                label="Against Bot"
+                gametype="bot"
+                handler={play}
+              />
+            </VStack>
+          </VStack>
+        </HStack>
+      </Container>
     </Flex>
   );
 };

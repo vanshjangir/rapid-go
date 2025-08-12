@@ -31,7 +31,7 @@ const ReviewGame = () => {
   }, []);
 
   return (
-    <div className="h-screen bg-[#222222] text-white flex flex-col">
+    <div className="h-screen bg-linear-gradient(135deg, #0f0f23 0%, #1a1a2e 25%, #16213e 50%, #0f3460 100%) text-white flex flex-col">
       <Navbar />
       <p>{moves}</p>
     </div>
