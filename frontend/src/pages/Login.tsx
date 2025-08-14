@@ -87,6 +87,32 @@ const Login: React.FC = () => {
     }
   };
 
+  const handleGuestLogin = async () => {
+    const response = await fetch(httpapi + '/login', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        "type": "guest",
+        "credential": "",
+      }),
+    });
+
+    if (response.status === 200) {
+      const json = await response.json();
+      console.log("Login successful");
+      localStorage.setItem("token", json.token);
+      localStorage.setItem("username", json.username);
+      localStorage.setItem('isLoggedIn', 'true');
+      setUsername(json.username);
+      nav("/");
+    } else {
+      setError("Login unsuccessful");
+      console.log("Login unsuccessful");
+    }
+  }
+
   return (
     <Flex 
       minH="100vh" 
@@ -226,7 +252,36 @@ const Login: React.FC = () => {
               }}
               _active={{ transform: "translateY(0)" }}
             >
-              Sign In
+              Log In
+            </Button>
+            
+            <HStack alignItems="center" my={4} w="full">
+              <Divider borderColor="whiteAlpha.300" flex="1" />
+              <Text mx={4} color="gray.400" fontSize="sm" fontWeight="500">
+                OR
+              </Text>
+              <Divider borderColor="whiteAlpha.300" flex="1" />
+            </HStack>
+
+            <Button
+              onClick={handleGuestLogin}
+              w="full"
+              py={3}
+              h="auto"
+              bg="linear-gradient(135deg, #f6ad55, #ed8936)"
+              color="white"
+              borderRadius="xl"
+              fontWeight="700"
+              fontSize="lg"
+              transition="all 0.3s ease"
+              _hover={{ 
+                transform: "translateY(-2px)",
+                boxShadow: "0 8px 25px rgba(237, 137, 54, 0.3)",
+                bg: "linear-gradient(135deg, #ed8936, #dd6b20)"
+              }}
+              _active={{ transform: "translateY(0)" }}
+            >
+              Log In as Guest
             </Button>
 
             <HStack alignItems="center" my={4} w="full">
@@ -237,29 +292,17 @@ const Login: React.FC = () => {
               <Divider borderColor="whiteAlpha.300" flex="1" />
             </HStack>
 
-            <Box
-              w="full"
-              display="flex"
-              justifyContent="center"
-              p={3}
-              bg="rgba(26, 32, 44, 0.6)"
-              borderRadius="xl"
-              border="1px solid"
-              borderColor="whiteAlpha.300"
-              _hover={{ borderColor: "whiteAlpha.400" }}
-              transition="all 0.2s ease"
-            >
-              <GoogleLogin
-                onSuccess={(credentialResponse) => {
-                  handleGoogleLogin(credentialResponse);
-                }}
-                onError={() => {
-                  console.log("Google Login Failed");
-                  setError("Google Login unsuccessful");
-                }}
-                useOneTap
-              />
-            </Box>
+            <GoogleLogin
+              onSuccess={(credentialResponse) => {
+                handleGoogleLogin(credentialResponse);
+              }}
+              onError={() => {
+                console.log("Google Login Failed");
+                setError("Google Login unsuccessful");
+              }}
+              useOneTap
+            />
+
           </VStack>
         </Box>
 

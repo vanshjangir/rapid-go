@@ -12,7 +12,7 @@ export const PlayButton = (
       onClick={() => handler(gametype)}
       w="full"
       size="lg"
-      fontSize="xl"
+      fontSize="3xl"
       fontWeight="bold"
       py={6}
       h="auto"

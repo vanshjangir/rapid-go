@@ -21,6 +21,7 @@ import (
 const (
 	TOKEN_TYPE_JWT   = "1"
 	TOKEN_TYPE_OAUTH = "2"
+	TOKEN_TYPE_GUEST = "3"
 )
 
 type loginData struct {
@@ -142,6 +143,23 @@ func loginByGoogle(ctx *gin.Context, req *loginData) {
 	})
 }
 
+func loginAsGuest(ctx *gin.Context) {
+	uniqueId := int(uuid.New().ID())
+	username := "G" + strconv.Itoa(uniqueId)
+
+	token, err := createToken(username)
+	if err != nil {
+		ctx.JSON(500, gin.H{"error": "Error generating token"})
+		return
+	}
+
+	ctx.JSON(200, gin.H{
+		"message":  "Login successful",
+		"token":    TOKEN_TYPE_GUEST + token,
+		"username": username,
+	})
+}
+
 func Login(ctx *gin.Context) {
 	var req loginData
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -154,5 +172,7 @@ func Login(ctx *gin.Context) {
 		loginByEmail(ctx, &req)
 	case "google-token":
 		loginByGoogle(ctx, &req)
+	case "guest":
+		loginAsGuest(ctx)
 	}
 }

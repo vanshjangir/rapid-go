@@ -307,11 +307,11 @@ const Game: React.FC = () => {
           rowDiv.className = "text-white flex flex-row w-full";
 
           const firstMove = document.createElement("div");
-          firstMove.className = "bg-[#2d3748] w-[50%] text-center p-1 border border-whiteAlpha-200";
+          firstMove.className = "bg-[#2d3748] w-[50%] text-center p-1";
           firstMove.textContent = toShow(history[index]);
 
           const secondMove = document.createElement("div");
-          secondMove.className = "bg-[#4a5568] w-[50%] text-center p-1 border border-whiteAlpha-200";
+          secondMove.className = "bg-[#4a5568] w-[50%] text-center p-1";
           secondMove.textContent = toShow(history[index + 1]);
 
           rowDiv.appendChild(firstMove);

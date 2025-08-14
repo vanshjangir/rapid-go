@@ -13,6 +13,7 @@ import {
   Collapse
 } from "@chakra-ui/react";
 import { HamburgerIcon, CloseIcon } from "@chakra-ui/icons";
+import { FiLogOut } from "react-icons/fi";
 import { ReconnectButton } from "./Buttons";
 import { useGlobalContext } from "../GlobalContext";
 import { MsgStart } from "../types/game";
@@ -106,13 +107,9 @@ const Navbar: React.FC = () => {
       position="sticky"
       top="0"
       zIndex="1000"
-      bg="linear-gradient(135deg, rgba(26, 32, 44, 0.95), rgba(45, 55, 72, 0.95))"
-      backdropFilter="blur(20px)"
-      borderBottom="2px solid"
-      borderColor="whiteAlpha.200"
-      boxShadow="0 8px 32px rgba(0, 0, 0, 0.3)"
+      bg="transparent"
     >
-      <Box maxW="7xl" mx="auto" px={{ base: 4, sm: 6, lg: 8 }}>
+      <Box maxW="6xl" mx="auto" px={{ base: 4, sm: 6, lg: 8 }}>
         <Flex justify="space-between" h={20} align="center">
           <Flex align="center">
             <Link href="/" _hover={{ textDecoration: 'none' }}>
@@ -130,7 +127,7 @@ const Navbar: React.FC = () => {
                 letterSpacing="tight"
                 textShadow="0 0 20px rgba(237, 137, 54, 0.3)"
               >
-                Rapid Go
+                RapidGo
               </Text>
             </Link>
             {recon === true && (
@@ -143,9 +140,9 @@ const Navbar: React.FC = () => {
               <HStack spacing={6}>
                 <Link
                   onClick={() => nav(`/profile/${username}`)}
-                  color="orange.200"
+                  color="orange.400"
                   fontWeight="600"
-                  fontSize="xl"
+                  fontSize="2xl"
                   _hover={{ 
                     textDecoration: 'none',
                     color: "orange.100",
@@ -173,7 +170,7 @@ const Navbar: React.FC = () => {
                   border="2px solid"
                   borderColor="whiteAlpha.300"
                 >
-                  Logout
+                  <FiLogOut/>
                 </Button>
               </HStack>
             ) : (
@@ -194,8 +191,6 @@ const Navbar: React.FC = () => {
                   py={3}
                   fontWeight="600"
                   transition="all 0.3s ease"
-                  border="2px solid"
-                  borderColor="whiteAlpha.300"
                 >
                   Login
                 </Button>
@@ -215,8 +210,6 @@ const Navbar: React.FC = () => {
                   py={3}
                   fontWeight="600"
                   transition="all 0.3s ease"
-                  border="2px solid"
-                  borderColor="orange.400"
                 >
                   Sign Up
                 </Button>

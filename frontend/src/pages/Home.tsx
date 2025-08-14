@@ -6,8 +6,6 @@ import Navbar from "../components/Navbar";
 import { PlayButton } from "../components/Buttons"
 import { Flex, Box, Text, Image, VStack, HStack, Container } from "@chakra-ui/react";
 
-const TOKEN_TYPE_GUEST = "3";
-
 const Home = () => {
   const nav = useNavigate();
   const { connect, player, destSocket } = useGlobalContext();
@@ -15,9 +13,9 @@ const Home = () => {
   const token = localStorage.getItem("token") || "";
   const httpapi = import.meta.env.VITE_HTTP_URL
 
-  const getWsurl = async (authtoken: string) => {
+  const getWsurl = async () => {
     const response = await fetch(httpapi + "/getwsurl", {
-      headers: { Authorization : authtoken }
+      headers: { Authorization : token }
     });
 
     const json = await response.json();
@@ -25,16 +23,15 @@ const Home = () => {
   }
 
   const play = async (how: string) => {
-    const authtoken = token || TOKEN_TYPE_GUEST;
     if (how === "bot") {
-      const wsurl = await getWsurl(authtoken);
-      connectToGame("ws://" + wsurl, authtoken, how);
+      const wsurl = await getWsurl();
+      connectToGame("ws://" + wsurl, how);
     } else {
-      findGame(authtoken, how);
+      findGame(how);
     }
   }
 
-  const connectToGame = (wsurl: string, token: string, how: string) => {
+  const connectToGame = (wsurl: string, how: string) => {
     const uri = (how === "bot" ? "/againstbot" : "/game")
       + "?type=new&token=" + token;
     
@@ -53,7 +50,7 @@ const Home = () => {
     };
   }
 
-  const findGame = async (token: string, how: string) => {
+  const findGame = async (how: string) => {
     setMatchStatus("pending");
     const response = await fetch(httpapi + "/findgame", {
       headers: {
@@ -64,8 +61,9 @@ const Home = () => {
     if (response.status === 200) {
       const wsurl = json.wsurl;
       localStorage.setItem('wsurl', wsurl);
-      connectToGame("ws://" + wsurl, token, how);
+      connectToGame("ws://" + wsurl, how);
     } else {
+    setMatchStatus("");
       console.log(`Error occured while finding a game ${json}`);
     }
   };
@@ -97,7 +95,7 @@ const Home = () => {
       <Container maxW="1300px" flex="1" mt={"160px"} py={6}>
         <HStack 
           justifyContent="center" 
-          spacing={{ base: 0, lg: 0 }} 
+          spacing={{ base: 0, lg: 4 }} 
           alignItems="center" 
           w="full" 
           h="full"
@@ -132,7 +130,7 @@ const Home = () => {
             w={{ base: "auto", lg: "542px" }} 
           >
             {/* Title Section */}
-            <VStack spacing={4} textAlign="center">
+            <VStack w={"full"} spacing={4} textAlign="center">
               <Box position="relative">
                 <Text 
                   fontSize={{ base: "4xl", md: "5xl", lg: "6xl" }} 
@@ -197,12 +195,11 @@ const Home = () => {
               bg="linear-gradient(135deg, rgba(26, 32, 44, 0.9), rgba(45, 55, 72, 0.8))"
               backdropFilter="blur(12px)"
               rounded="2xl"
-              p={6}
+              p={4}
               border="2px solid"
               borderColor="whiteAlpha.200"
               boxShadow="0 8px 32px rgba(0, 0, 0, 0.3)"
               w="full"
-              maxW="400px"
             >
               {/* Gradient overlay */}
               <Box
@@ -259,16 +256,16 @@ const Home = () => {
                       fontWeight="600"
                       textAlign="center"
                     >
-                      {token ? "Ready for battle!" : "Join as guest or login"}
+                      {token ? "Ready for battle!" : "Log In to Play"}
                     </Text>
                   </VStack>
                 )}
             </Box>
 
             {/* Game Buttons */}
-            <VStack spacing={5} w="full" maxW="400px">
+            <VStack spacing={4} w="full">
               <PlayButton
-                label={token ? "Play Online" : "Play as Guest"}
+                label={"Play Online"}
                 gametype="player"
                 handler={play}
               />

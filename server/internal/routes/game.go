@@ -45,15 +45,6 @@ func getRating(username string) int {
 	return rating
 }
 
-func addBotEntry(g *core.Game) error {
-	db := database.GetDatabase()
-	updateQuery := `UPDATE games SET white = $2 WHERE gameid = $1`
-	if _, err := db.Exec(updateQuery, g.Id, "bot"); err != nil {
-		return err
-	}
-	return nil
-}
-
 func addGame(g *core.Game) error {
 	player := "white"
 	if g.Player.Color == core.BlackCell {
@@ -112,30 +103,6 @@ func startGame(g *core.Game) {
 	go core.MonitorTimeout(g)
 }
 
-func startGameBot(g *core.Game) {
-	log.Println("New match has started")
-
-	g.InitGame()
-	g.Player.Rating = getRating(g.Player.Username)
-	g.Player.Wsc.WriteJSON(
-		core.StartMsg{Start: 1, Color: 1, GameId: g.Id},
-	)
-
-	core.Pmap[g.Player.Username] = g
-	g.Over = make(chan bool)
-	if err := addGame(g); err != nil {
-		log.Println("Error occurred in adding Game data:", err)
-		return
-	}
-
-	if err := addBotEntry(g); err != nil {
-		log.Println("Error occurred in adding Bot Entry:", err)
-		return
-	}
-
-	go core.PlayGameBot(g)
-}
-
 func reconnect(username string, c *websocket.Conn) bool {
 	g, ok := core.Pmap[username]
 	if !ok || g == nil {
@@ -148,23 +115,6 @@ func reconnect(username string, c *websocket.Conn) bool {
 		core.StartMsg{Start: 1, Color: g.Player.Color, GameId: g.Id},
 	)
 	go core.PlayGame(g)
-
-	log.Println("Player reconnected", username)
-	return true
-}
-
-func reconnectBot(username string, c *websocket.Conn) bool {
-	game, ok := core.Pmap[username]
-	if !ok || game == nil {
-		return false
-	}
-
-	game.Player.DisConn = false
-	game.Player.Wsc = c
-	game.Player.Wsc.WriteJSON(
-		core.StartMsg{Start: 1, Color: core.BlackCell, GameId: game.Id},
-	)
-	go core.PlayGameBot(game)
 
 	log.Println("Player reconnected", username)
 	return true
@@ -216,12 +166,6 @@ func setupGame(g *core.Game) {
 	}
 }
 
-func setupGameBot(g *core.Game) {
-	g.Id = core.GetUniqueId()
-	g.Player.Color = core.BlackCell
-	startGameBot(g)
-}
-
 func ConnectPlayer(ctx *gin.Context) {
 	w, r := ctx.Writer, ctx.Request
 	gameType := ctx.Query("type")
@@ -253,37 +197,4 @@ func ConnectPlayer(ctx *gin.Context) {
 	game.Player.Wsc = c
 
 	go setupGame(game)
-}
-
-func ConnectAgainstBot(ctx *gin.Context) {
-	w, r := ctx.Writer, ctx.Request
-	gameType := ctx.Query("type")
-	username := getUsername(ctx)
-	if len(username) == 0 {
-		return
-	}
-
-	c, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Println("ConnectPlayer:", err)
-		return
-	}
-
-	if gameType == "reconnect" {
-		if ok := reconnectBot(username, c); !ok {
-			c.WriteMessage(
-				websocket.TextMessage,
-				[]byte("Error in reconnecting"),
-			)
-		}
-		return
-	}
-
-	g := new(core.Game)
-	g.Player = new(core.Player)
-	g.Player.Game = g
-	g.Player.Username = username
-	g.Player.Wsc = c
-
-	setupGameBot(g)
 }

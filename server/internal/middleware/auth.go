@@ -5,14 +5,12 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"github.com/vanshjangir/rapid-go/server/internal/database"
 	"google.golang.org/api/oauth2/v2"
 	"google.golang.org/api/option"
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 )
 
 const (
@@ -122,8 +120,20 @@ func auth(ctx *gin.Context, token string) {
 		ctx.Next()
 
 	case TOKEN_TYPE_GUEST:
-		uniqueId := int(uuid.New().ID())
-		ctx.Set("username", "G"+strconv.Itoa(uniqueId))
+		token, err := verifyToken(token[1:])
+		if err != nil {
+			fmt.Printf("JWT verification failed: %v\n", err)
+			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			ctx.Abort()
+			return
+		}
+		fmt.Printf("JWT verified. Claims: %+v\n", token.Claims)
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid claims"})
+			ctx.Abort()
+		}
+		ctx.Set("username", claims["username"])
 		ctx.Next()
 
 	default:
