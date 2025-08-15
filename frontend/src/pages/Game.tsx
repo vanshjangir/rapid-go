@@ -1,19 +1,17 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGlobalContext } from "../GlobalContext";
 import { ChatMessage, MsgChat, MsgMove, MsgMoveStatus, MsgSync, MsgGameover } from "../types/game";
 import { GameState } from "../types/game";
 import Navbar from "../components/Navbar";
-import { Inflate } from "pako";
 import {
   cellSize,
   gridSize,
   placeStone,
-  WHITE_CELL,
-  BLACK_CELL,
   EMPTY_CELL,
   handleCanvasClick,
-  handleResize,
+  redrawCanvas,
   retainOldState,
+  decodeState,
 } from "../utils/board";
 import {
   Box,
@@ -39,14 +37,8 @@ const Game: React.FC = () => {
   const chatRef = useRef<HTMLDivElement>(null);
   const messages = useRef<ChatMessage[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  gameStateRef.current = {
-    gameId: player.gameId,
-    color: player.color,
-    state: Array.from({ length: 19 }, () => Array(19).fill(EMPTY_CELL)),
-    turn: player.color === 1 ? true : false,
-    history: []
-  };
+  const [pname, setPname] = useState<string>("");
+  const [opname, setOpname] = useState<string>("");
 
   let playerTime = 900;
   let opponentTime = 900;
@@ -64,75 +56,28 @@ const Game: React.FC = () => {
     socket.send(JSON.stringify({ type: "move", move: "ps" }));
   };
 
-  const decodeState = (state: string, move: string) => {
-    try {
-      if (!gameStateRef.current) return;
-      const gameState = gameStateRef.current;
-      const base64Enc = state.replace(/-/g, '+').replace(/_/g, '/');
-      const data = Uint8Array.from(atob(base64Enc), char => char.charCodeAt(0));
-      const size = data[0];
-      const dict = new Uint8Array([2, 1, 0]);
-      const inflater = new Inflate({
-        windowBits: -15,
-        dictionary: dict
-      });
-
-      let newMoves: { x: number; y: number; c: number }[] = [];
-      try {
-        inflater.push(data.slice(1), true);
-      } catch (e) {
-        console.error('Inflation error:', e);
-        throw e;
+  const updateState = (state: string, move: string) => {
+    if (!gameStateRef.current)
+      return;
+    
+    const gameState = gameStateRef.current;
+    const newMoves = decodeState(gameStateRef, state);
+    
+    newMoves.forEach((item) => {
+      gameState.state[item.x][item.y] = item.c;
+      if (item.c === EMPTY_CELL) {
+        placeStone(canvasRef, ctxRef, item.x, item.y, EMPTY_CELL);
+        return;
       }
+      gameState.turn = !gameState.turn;
+      showMoveStatus(move);
+      placeStone(canvasRef, ctxRef, item.x, item.y, item.c);
+    });
 
-      if (inflater.err) {
-        throw new Error(`Decompression failed: ${inflater.msg}`);
-      }
-
-      const decompressed = inflater.result;
-      let pos = 0;
-      for (let j = 0; j < size; j++) {
-        for (let i = 0; i < size; i++) {
-          if (pos >= decompressed.length) {
-            throw new Error('Unexpected end of decompressed data');
-          }
-          const c = decompressed[pos++];
-          switch (c) {
-            case 2:
-              if (gameState.state[i][j] !== BLACK_CELL)
-                newMoves.push({ x: i, y: j, c: BLACK_CELL });
-              break;
-            case 1:
-              if (gameState.state[i][j] !== WHITE_CELL)
-                newMoves.push({ x: i, y: j, c: WHITE_CELL });
-              break;
-            case 0:
-              if (gameState.state[i][j] !== EMPTY_CELL)
-                newMoves.push({ x: i, y: j, c: EMPTY_CELL });
-              break;
-          }
-        }
-      }
-
-      newMoves.forEach((item) => {
-        gameState.state[item.x][item.y] = item.c;
-        if (item.c === EMPTY_CELL) {
-          placeStone(canvasRef, ctxRef, item.x, item.y, EMPTY_CELL);
-          return;
-        }
-        gameState.turn = !gameState.turn;
-        showMoveStatus(move);
-        placeStone(canvasRef, ctxRef, item.x, item.y, item.c);
-      });
-
-      if (!gameState.history) gameState.history = [];
-      gameState.history.push(move);
-      updateHistory(gameState.history);
-    } catch (error) {
-      console.error('Decode error:', error);
-      throw error;
-    }
-  };
+    if (!gameState.history) gameState.history = [];
+    gameState.history.push(move);
+    updateHistory(gameState.history);
+  }
 
   const handleAbort = () => {
     const socket = socketRef.current;
@@ -142,7 +87,6 @@ const Game: React.FC = () => {
   const handleSocketRecv = async (data: any) => {
     const msg: MsgMove | MsgMoveStatus | MsgSync | MsgGameover | MsgChat =
       await JSON.parse(data);
-    console.log("MoveStatus", msg);
     switch (msg.type) {
       case "movestatus":
         if (msg.turnStatus === false) {
@@ -164,7 +108,7 @@ const Game: React.FC = () => {
             updateHistory(gameState.history);
             showMoveStatus("Pass");
           } else {
-            decodeState(msg.state, msg.move);
+            updateState(msg.state, msg.move);
           }
           playerTime = 900 - Math.round(msg.selfTime / 1000);
           opponentTime = 900 - Math.round(msg.opTime / 1000);
@@ -180,7 +124,7 @@ const Game: React.FC = () => {
             updateHistory(gameState.history);
             showMoveStatus("Pass");
           } else {
-            decodeState(msg.state, msg.move);
+            updateState(msg.state, msg.move);
           }
           playerTime = 900 - Math.round(msg.selfTime / 1000);
           opponentTime = 900 - Math.round(msg.opTime / 1000);
@@ -190,17 +134,21 @@ const Game: React.FC = () => {
       case "sync":
         if (gameStateRef.current) {
           const gameState = gameStateRef.current;
-          console.log("Sycn State", msg);
           gameState.gameId = msg.gameId;
           gameState.color = msg.color;
           gameState.turn = msg.turn;
+          gameState.pname = msg.pname;
+          gameState.opname = msg.opname;
 
-          decodeState(msg.state, "");
+          updateState(msg.state, "");
+
+          setPname(gameState.pname)
+          setOpname(gameState.opname)
 
           gameState.history = msg.history;
           playerTime = 900 - Math.round(msg.selfTime / 1000);
           opponentTime = 900 - Math.round(msg.opTime / 1000);
-          handleResize(canvasRef, gameStateRef, ctxRef);
+          redrawCanvas(canvasRef, gameStateRef, ctxRef);
           setupClock();
           updateHistory(gameState.history);
         }
@@ -292,7 +240,6 @@ const Game: React.FC = () => {
       const slast = history[history.length - 2];
       if (last === "ps" && slast === "ps") {
         if (msgRef.current) {
-          console.log("aya", history);
           msgRef.current.className = "text-center text-3xl font-bold h-[40px]";
           msgRef.current.innerText = "Evaluating...";
         }
@@ -368,7 +315,7 @@ const Game: React.FC = () => {
   };
 
   useEffect(() => {
-    handleResize(canvasRef, gameStateRef, ctxRef);
+    redrawCanvas(canvasRef, gameStateRef, ctxRef);
     setupClock();
   }, [gameStateRef.current]);
 
@@ -387,6 +334,16 @@ const Game: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    gameStateRef.current = {
+      gameId: player.gameId,
+      pname: "",
+      opname: "",
+      color: player.color,
+      state: Array.from({ length: 19 }, () => Array(19).fill(EMPTY_CELL)),
+      turn: player.color === 1 ? true : false,
+      history: []
+    };
+
     setupSocket();
     getGameState();
     setupClock();
@@ -395,12 +352,12 @@ const Game: React.FC = () => {
       handleCanvasClick(canvasRef, gameStateRef, ctxRef, socketRef, e);
     };
     const resizeHandler = () => {
-      handleResize(canvasRef, gameStateRef, ctxRef);
+      redrawCanvas(canvasRef, gameStateRef, ctxRef);
     };
 
     canvasRef.current?.addEventListener("click", clickHandler);
     window.addEventListener("resize", resizeHandler);
-    handleResize(canvasRef, gameStateRef, ctxRef);
+    redrawCanvas(canvasRef, gameStateRef, ctxRef);
 
     return () => {
       canvasRef.current?.removeEventListener("click", clickHandler);
@@ -460,7 +417,7 @@ const Game: React.FC = () => {
             boxShadow="0 20px 40px rgba(0, 0, 0, 0.4)"
           >
             <VStack spacing={2} textAlign="center">
-              <Text fontSize="xl" fontWeight="600" color="orange.200">Opponent</Text>
+              <Text fontSize="xl" fontWeight="600" color="orange.200">{opname}</Text>
               <Box 
                 as="div" 
                 ref={opponentClockRef} 
@@ -477,7 +434,7 @@ const Game: React.FC = () => {
               />
             </VStack>
             <VStack spacing={2} textAlign="center">
-              <Text fontSize="xl" fontWeight="600" color="orange.200">Player</Text>
+              <Text fontSize="xl" fontWeight="600" color="orange.200">{pname}</Text>
               <Box 
                 as="div" 
                 ref={playerClockRef} 

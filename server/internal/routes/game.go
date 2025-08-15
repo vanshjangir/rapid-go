@@ -145,25 +145,59 @@ func getPlayerGame(username string) (string, error) {
 	if err == redis.Nil {
 		return "", fmt.Errorf("player %s is not in a live game", username)
 	} else if err != nil {
-		return "", fmt.Errorf("failed to get player's game: %w", err)
+		return "", fmt.Errorf("failed to get game data: %w", err)
 	}
 	return gameID, nil
 }
 
+func getOpName(gameId string) (string, error) {
+	hashKey := "live_game"
+
+	jsonData, err := pubsub.Rdb.HGet(pubsub.RdbCtx, hashKey, gameId).Result()
+	if err != nil {
+		return "", fmt.Errorf("failed to get players name: %w", err)
+	}
+	return jsonData, nil
+}
+
 func setupGame(g *core.Game) {
-	if jsondata, err := getPlayerGame(g.Player.Username); err != nil {
+	var jsondata string
+	var err error
+	var players map[string]any
+	var gameData map[string]any
+
+	jsondata, err = getPlayerGame(g.Player.Username)
+	if err != nil {
 		log.Println("Error getting player game", err)
 		return
-	} else {
-		var gameData map[string]any
-		if err := json.Unmarshal([]byte(jsondata), &gameData); err != nil {
-			log.Println("Error in Unmarshalling json for setupGame: ", err)
-			return
-		}
-		g.Id = gameData["gameId"].(string)
-		g.Player.Color = int(gameData["color"].(float64))
-		startGame(g)
 	}
+
+	err = json.Unmarshal([]byte(jsondata), &gameData)
+	if err != nil {
+		log.Println("Error in Unmarshalling json for setupGame: ", err)
+		return
+	}
+
+	jsondata, err = getOpName(g.Id)
+	if err != nil {
+		log.Println("Error getting Op name from redis", err)
+		return
+	}
+
+	err = json.Unmarshal([]byte(jsondata), &players)
+	if err != nil {
+		log.Println("Error in Unmarshalling json for setupGame: ", err)
+		return
+	}
+
+	g.Id = gameData["gameId"].(string)
+	g.Player.Color = int(gameData["color"].(float64))
+	if g.Player.Color == core.BlackCell {
+		g.OpName = players["white"].(string)
+	} else {
+		g.OpName = players["black"].(string)
+	}
+	startGame(g)
 }
 
 func ConnectPlayer(ctx *gin.Context) {

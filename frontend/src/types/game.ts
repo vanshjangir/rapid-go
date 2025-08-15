@@ -44,6 +44,8 @@ export interface MsgMove {
 export interface MsgSync {
   type: "sync";
   gameId: string;
+  pname: string;
+  opname: string;
   color: number;
   state: string;
   turn: boolean;
@@ -59,6 +61,8 @@ export interface MsgChat {
 
 export interface GameState {
   gameId: string;
+  pname: string;
+  opname: string;
   color: number;
   state: number[][];
   turn: boolean;

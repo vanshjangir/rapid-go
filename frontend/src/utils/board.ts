@@ -1,4 +1,5 @@
 import { GameState, MsgMoveStatus } from "../types/game";
+import { Inflate } from "pako";
 
 export let gridSize = 684;
 export let cellSize = gridSize / 19;
@@ -71,7 +72,7 @@ export const drawBoard = async (
   ctxRef.current = context;
 };
 
-export const handleResize = (
+export const redrawCanvas = (
   canvasRef: React.RefObject<HTMLCanvasElement>,
   gameStateRef: React.MutableRefObject<GameState | null>,
   ctxRef: React.MutableRefObject<CanvasRenderingContext2D | null>
@@ -220,3 +221,62 @@ export const retainOldState = (
     );
   }
 }
+
+
+export const decodeState = (
+  gameStateRef: React.MutableRefObject<GameState | null>,
+  state: string,
+): {x: number, y: number, c: number}[] => {
+  try {
+    if (!gameStateRef.current) return [];
+    const gameState = gameStateRef.current;
+    const base64Enc = state.replace(/-/g, '+').replace(/_/g, '/');
+    const data = Uint8Array.from(atob(base64Enc), char => char.charCodeAt(0));
+    const size = data[0];
+    const dict = new Uint8Array([2, 1, 0]);
+    const inflater = new Inflate({
+      windowBits: -15,
+      dictionary: dict
+    });
+
+    let newMoves: { x: number; y: number; c: number }[] = [];
+    try {
+      inflater.push(data.slice(1), true);
+    } catch (e) {
+      throw e;
+    }
+
+    if (inflater.err) {
+      throw new Error(`Decompression failed: ${inflater.msg}`);
+    }
+
+    const decompressed = inflater.result;
+    let pos = 0;
+    for (let j = 0; j < size; j++) {
+      for (let i = 0; i < size; i++) {
+        if (pos >= decompressed.length) {
+          throw new Error('Unexpected end of decompressed data');
+        }
+        const c = decompressed[pos++];
+        switch (c) {
+          case 2:
+            if (gameState.state[i][j] !== BLACK_CELL)
+              newMoves.push({ x: i, y: j, c: BLACK_CELL });
+            break;
+          case 1:
+            if (gameState.state[i][j] !== WHITE_CELL)
+              newMoves.push({ x: i, y: j, c: WHITE_CELL });
+            break;
+          case 0:
+            if (gameState.state[i][j] !== EMPTY_CELL)
+              newMoves.push({ x: i, y: j, c: EMPTY_CELL });
+            break;
+        }
+      }
+    }
+
+    return newMoves;
+  } catch (error) {
+    throw error;
+  }
+};

@@ -97,6 +97,8 @@ func handleSyncState(g *Game) {
 	var syncMsg SyncMsg
 	syncMsg.Type = "sync"
 	syncMsg.Color = g.Player.Color
+	syncMsg.PName = g.Player.Username
+	syncMsg.OpName = g.OpName
 	syncMsg.GameId = g.Id
 	syncMsg.History = g.History
 	syncMsg.SelfTime = g.GetTime(g.Player.Color)
@@ -113,7 +115,7 @@ func handleSyncState(g *Game) {
 	}
 
 	if err := g.Player.Wsc.WriteJSON(syncMsg); err != nil {
-		log.Println("Error sending sync msg:", err)
+		log.Println("Error sending sync msg:", err, syncMsg)
 	}
 }
 
@@ -182,6 +184,48 @@ func sendToPubsub(g *Game, jsonData any, msgType string) {
 	}
 }
 
+func updateStateInRedis(g *Game) {
+	hashkey := "live_game"
+	rawJsonString, err := pubsub.Rdb.HGet(pubsub.RdbCtx, hashkey, g.Id).Result()
+	if err != nil {
+		log.Println("Error Getting game data from redis:", err)
+		return
+	}
+
+	var gdr GameDataRedis
+	if err := json.Unmarshal([]byte(rawJsonString), &gdr); err != nil {
+		log.Println("Error in Unmarshalling json of game data from redis:", err)
+		return
+	}
+
+	gdr.History = g.History
+	gdr.Turn = g.Turn
+	gdr.BTime = g.GetTime(BlackCell)
+	gdr.WTime = g.GetTime(WhiteCell)
+	gdr.LastUpdated = time.Now()
+	if state, err := g.Board.Encode(); err != nil {
+		log.Println("Error encoding board state:", err)
+	} else {
+		gdr.State = state
+	}
+
+	if rawJsonByte, err := json.Marshal(gdr); err != nil {
+		log.Println("Error marshalling game data to store in redis:", err)
+	} else {
+		err = pubsub.Rdb.HSet(
+			pubsub.RdbCtx,
+			hashkey,
+			g.Id,
+			string(rawJsonByte),
+		).Err()
+		if err != nil {
+			log.Println(
+				"Failed to set game data in redis while updating:\n", gdr, err,
+			)
+		}
+	}
+}
+
 func handleMove(g *Game, msgBytes []byte) error {
 	var moveMsg MoveMsg
 	var moveStatus MoveStatusMsg
@@ -215,6 +259,8 @@ func handleMove(g *Game, msgBytes []byte) error {
 
 	g.TapClock(g.Player.Color)
 	g.Turn = 1 - g.Player.Color
+
+	updateStateInRedis(g)
 
 	moveStatus.MoveStatus = true
 	moveStatus.TurnStatus = true
@@ -302,7 +348,15 @@ func handlePubsubMove(g *Game, msgBytes []byte) {
 	g.TapClock(1 - g.Player.Color)
 	g.Turn = g.Player.Color
 
-	sendToClient(g, msgBytes)
+	// just switch the timing that op has sent, because it has sent the
+	// timings with its perspective, we need to swap it
+	moveMsg.SelfTime, moveMsg.OpTime = moveMsg.OpTime, moveMsg.SelfTime
+
+	if rawjson, err := json.Marshal(moveMsg); err != nil {
+		log.Println("Error marshalling moveMsg in handlePubsubMove:", err)
+	} else {
+		sendToClient(g, rawjson)
+	}
 }
 
 func handleGameOverPubsub(g *Game, msgBytes []byte) {

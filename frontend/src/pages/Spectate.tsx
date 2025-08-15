@@ -1,17 +1,16 @@
-import { useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from 'react-router-dom';
 import { MsgChat, MsgMove, MsgMoveStatus, MsgSync, MsgGameover } from "../types/game";
 import { GameState } from "../types/game";
 import Navbar from "../components/Navbar";
-import { Inflate } from "pako";
 import {
   cellSize,
   gridSize,
   placeStone,
-  WHITE_CELL,
   BLACK_CELL,
   EMPTY_CELL,
-  handleResize,
+  redrawCanvas,
+  decodeState,
 } from "../utils/board";
 import {
   Box,
@@ -24,24 +23,19 @@ const Spectate: React.FC = () => {
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const socketRef = useRef<WebSocket | null>(null);
+  const setupSocketRef = useRef<boolean>(false);
   const intervalRef = useRef<number | null>(null);
   const playerClockRef = useRef<HTMLDivElement>(null);
   const opponentClockRef = useRef<HTMLDivElement>(null);
   const gameStateRef = useRef<GameState | null>(null);
   const historyDivRef = useRef<HTMLDivElement>(null);
   const msgRef = useRef<HTMLDivElement>(null);
+  
   const httpapi = import.meta.env.VITE_HTTP_URL
   const token = localStorage.getItem("token") || "";
   const { gameId } = useParams();
-  
-  gameStateRef.current = {
-    gameId: gameId || "",
-    color: BLACK_CELL,
-    state: Array.from({ length: 19 }, () => Array(19).fill(EMPTY_CELL)),
-    turn: true,
-    history: []
-  };
-
+  const [pname, setPname] = useState<string>("Black");
+  const [opname, setOpname] = useState<string>("White");
 
   let playerTime = 900;
   let opponentTime = 900;
@@ -52,75 +46,27 @@ const Spectate: React.FC = () => {
     socket.send(JSON.stringify({ type: "reqState", }));
   };
 
-  const decodeState = (state: string, move: string) => {
-    try {
-      if (!gameStateRef.current) return;
-      const gameState = gameStateRef.current;
-      const base64Enc = state.replace(/-/g, '+').replace(/_/g, '/');
-      const data = Uint8Array.from(atob(base64Enc), char => char.charCodeAt(0));
-      const size = data[0];
-      const dict = new Uint8Array([2, 1, 0]);
-      const inflater = new Inflate({
-        windowBits: -15,
-        dictionary: dict
-      });
-
-      let newMoves: { x: number; y: number; c: number }[] = [];
-      try {
-        inflater.push(data.slice(1), true);
-      } catch (e) {
-        console.error('Inflation error:', e);
-        throw e;
+  const updateState = (state: string, move: string) => {
+    if (!gameStateRef.current)
+      return;
+    
+    const gameState = gameStateRef.current;
+    const newMoves = decodeState(gameStateRef, state);
+    
+    newMoves.forEach((item) => {
+      gameState.state[item.x][item.y] = item.c;
+      if (item.c === EMPTY_CELL) {
+        placeStone(canvasRef, ctxRef, item.x, item.y, EMPTY_CELL);
+        return;
       }
+      gameState.turn = !gameState.turn;
+      showMoveStatus(move);
+      placeStone(canvasRef, ctxRef, item.x, item.y, item.c);
+    });
 
-      if (inflater.err) {
-        throw new Error(`Decompression failed: ${inflater.msg}`);
-      }
-
-      const decompressed = inflater.result;
-      let pos = 0;
-      for (let j = 0; j < size; j++) {
-        for (let i = 0; i < size; i++) {
-          if (pos >= decompressed.length) {
-            throw new Error('Unexpected end of decompressed data');
-          }
-          const c = decompressed[pos++];
-          switch (c) {
-            case 2:
-              if (gameState.state[i][j] !== BLACK_CELL)
-                newMoves.push({ x: i, y: j, c: BLACK_CELL });
-              break;
-            case 1:
-              if (gameState.state[i][j] !== WHITE_CELL)
-                newMoves.push({ x: i, y: j, c: WHITE_CELL });
-              break;
-            case 0:
-              if (gameState.state[i][j] !== EMPTY_CELL)
-                newMoves.push({ x: i, y: j, c: EMPTY_CELL });
-              break;
-          }
-        }
-      }
-
-      newMoves.forEach((item) => {
-        gameState.state[item.x][item.y] = item.c;
-        if (item.c === EMPTY_CELL) {
-          placeStone(canvasRef, ctxRef, item.x, item.y, EMPTY_CELL);
-          return;
-        }
-        gameState.turn = !gameState.turn;
-        showMoveStatus(move);
-        placeStone(canvasRef, ctxRef, item.x, item.y, item.c);
-      });
-
-      if (!gameState.history) gameState.history = [];
-      gameState.history.push(move);
-      updateHistory(gameState.history);
-    } catch (error) {
-      console.error('Decode error:', error);
-      throw error;
-    }
-  };
+    gameState.history.push(move);
+    updateHistory(gameState.history);
+  }
 
   const handleSocketRecv = async (data: any) => {
     const msg: MsgMove | MsgMoveStatus | MsgSync | MsgGameover | MsgChat =
@@ -135,7 +81,7 @@ const Spectate: React.FC = () => {
             updateHistory(gameState.history);
             showMoveStatus("Pass");
           } else {
-            decodeState(msg.state, msg.move);
+            updateState(msg.state, msg.move);
           }
           playerTime = 900 - Math.round(msg.selfTime / 1000);
           opponentTime = 900 - Math.round(msg.opTime / 1000);
@@ -148,7 +94,7 @@ const Spectate: React.FC = () => {
         }
         showEndMessage(
           msg.winner === gameStateRef.current?.color ?
-            "Black won" : "White won"
+            `${pname} won` : `${opname} won`
         );
         socketRef.current?.close();
         break;
@@ -156,17 +102,25 @@ const Spectate: React.FC = () => {
       case "sync":
         if (gameStateRef.current) {
           const gameState = gameStateRef.current;
-          console.log("Sync State", msg);
           gameState.gameId = msg.gameId;
           gameState.color = msg.color;
+          gameState.pname = msg.pname;
+          gameState.opname = msg.opname;
           gameState.turn = msg.turn;
+          
+          setPname(gameState.pname)
+          setOpname(gameState.opname)
 
-          decodeState(msg.state, "");
+          updateState(msg.state, "");
+         
+          // setting the turn here again, cuz updateState messes up with
+          // turn as well
+          gameState.turn = msg.turn;
 
           gameState.history = msg.history;
           playerTime = 900 - Math.round(msg.selfTime / 1000);
           opponentTime = 900 - Math.round(msg.opTime / 1000);
-          handleResize(canvasRef, gameStateRef, ctxRef);
+          redrawCanvas(canvasRef, gameStateRef, ctxRef);
           setupClock();
           updateHistory(gameState.history);
         }
@@ -188,11 +142,15 @@ const Spectate: React.FC = () => {
   }
 
   const setupSocket = async () => {
+    if (setupSocketRef.current) return;
+    setupSocketRef.current = true;
+
     const wsurl = await getWsurl();
-    socketRef.current = new WebSocket("ws://" + wsurl + `/spectate/${gameId}` + "?token=" + token);
-    const socket = socketRef.current;
-    if (socket) {
-      socket.onmessage = async (event: MessageEvent) => {
+    socketRef.current = new WebSocket(
+      "ws://" + wsurl + `/spectate/${gameId}` + "?token=" + token
+    );
+    if (socketRef.current) {
+      socketRef.current.onmessage = async (event: MessageEvent) => {
         const data = await event.data;
         handleSocketRecv(data);
       };
@@ -257,7 +215,6 @@ const Spectate: React.FC = () => {
       const slast = history[history.length - 2];
       if (last === "ps" && slast === "ps") {
         if (msgRef.current) {
-          console.log("aya", history);
           msgRef.current.className = "text-center text-3xl font-bold h-[40px]";
           msgRef.current.innerText = "Evaluating...";
         }
@@ -292,7 +249,7 @@ const Spectate: React.FC = () => {
   };
 
   useEffect(() => {
-    handleResize(canvasRef, gameStateRef, ctxRef);
+    redrawCanvas(canvasRef, gameStateRef, ctxRef);
     setupClock();
   }, [gameStateRef.current]);
 
@@ -311,15 +268,25 @@ const Spectate: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    gameStateRef.current = {
+      gameId: gameId || "",
+      pname: "",
+      opname: "",
+      color: BLACK_CELL,
+      state: Array.from({ length: 19 }, () => Array(19).fill(EMPTY_CELL)),
+      turn: true,
+      history: []
+    };
+
     setupSocket();
     getGameState();
 
     const resizeHandler = () => {
-      handleResize(canvasRef, gameStateRef, ctxRef);
+      redrawCanvas(canvasRef, gameStateRef, ctxRef);
     };
 
     window.addEventListener("resize", resizeHandler);
-    handleResize(canvasRef, gameStateRef, ctxRef);
+    redrawCanvas(canvasRef, gameStateRef, ctxRef);
 
     return () => {
       window.removeEventListener("resize", resizeHandler);
@@ -378,7 +345,7 @@ const Spectate: React.FC = () => {
             boxShadow="0 20px 40px rgba(0, 0, 0, 0.4)"
           >
             <VStack spacing={2} textAlign="center">
-              <Text fontSize="xl" fontWeight="600" color="orange.200">White</Text>
+              <Text fontSize="xl" fontWeight="600" color="orange.200">{opname}</Text>
               <Box 
                 as="div" 
                 ref={opponentClockRef} 
@@ -395,7 +362,7 @@ const Spectate: React.FC = () => {
               />
             </VStack>
             <VStack spacing={2} textAlign="center">
-              <Text fontSize="xl" fontWeight="600" color="orange.200">Black</Text>
+              <Text fontSize="xl" fontWeight="600" color="orange.200">{pname}</Text>
               <Box 
                 as="div" 
                 ref={playerClockRef} 

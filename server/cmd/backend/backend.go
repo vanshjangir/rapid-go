@@ -45,7 +45,7 @@ func main() {
 	}
 
 	routes.Pe = new(routes.PlayerExists)
-	routes.Pe.Ch = make(chan string)
+	routes.Pe.Ch = make(chan routes.GameStarterData)
 	routes.Pe.Exists = false
 
 	db := database.GetDatabase()

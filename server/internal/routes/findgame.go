@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/vanshjangir/rapid-go/server/internal/core"
@@ -16,14 +17,14 @@ type UserHashData struct {
 	Color  int    `json:"color"`
 }
 
-type GameHashData struct {
-	White string `json:"white"`
-	Black string `json:"black"`
+type GameStarterData struct {
+	GameId   string `json:"gameId"`
+	Username string `json:"white"`
 }
 
 type PlayerExists struct {
 	mu     sync.Mutex
-	Ch     chan string
+	Ch     chan GameStarterData
 	Exists bool
 }
 
@@ -58,46 +59,43 @@ func addPlayer(username string, userHashData UserHashData) {
 	}
 }
 
-func addGame(gameId string, gameHashData GameHashData, color int) {
+func addGame(gameId string, black string, white string) {
 	hashkey := "live_game"
-	exists, err := pubsub.Rdb.HExists(pubsub.RdbCtx, hashkey, gameId).Result()
-	if err != nil {
-		panic(err)
-	}
-	if exists == true {
-		jsondata, err := pubsub.Rdb.HGet(pubsub.RdbCtx, hashkey, gameId).Result()
-		if err != nil {
-			return
-		}
-		var tempData GameHashData
-		if err := json.Unmarshal([]byte(jsondata), &tempData); err != nil {
-			log.Println("Error in Unmarshalling json for setupGame: ", err)
-			return
-		}
-		if color == core.BlackCell {
-			gameHashData.Black = tempData.Black
-		} else {
-			gameHashData.White = tempData.White
-		}
-	}
 
-	jsondata, err := json.Marshal(gameHashData)
+	var gdr core.GameDataRedis
+	gdr.Black = black
+	gdr.White = white
+	gdr.Turn = core.BlackCell
+	gdr.Id = gameId
+
+	jsondata, err := json.Marshal(gdr)
 	if err != nil {
 		log.Println("Error marshling user hashdata", err)
 		return
 	}
+
 	err = pubsub.Rdb.HSet(pubsub.RdbCtx, hashkey, gameId, jsondata).Err()
 	if err != nil {
-		log.Printf("Failed to set player %v to game %v: %v\n",
-			gameId, gameHashData, err)
+		log.Printf(
+			"Failed to set game data %v to game %v: %v\n",
+			gdr, gameId, err,
+		)
 	} else {
-		log.Printf("Player %s is now in game %v\n", gameId, gameHashData)
+		log.Printf("Game data added in redis for %v : %v", gameId, gdr)
+	}
+
+	err = pubsub.Rdb.Expire(pubsub.RdbCtx, hashkey, 35*60*time.Second).Err()
+	if err != nil {
+		log.Printf(
+			"Failed to set expiration on game id %v: %v\n",
+			gameId, err,
+		)
 	}
 }
 
 func FindGame(ctx *gin.Context) {
 	var userHashData UserHashData
-	var gameHashData GameHashData
+	var gameStarterData GameStarterData
 	usernameItf, exists := ctx.Get("username")
 	if !exists {
 		ctx.JSON(500, gin.H{"error": "Internal server error"})
@@ -111,20 +109,31 @@ func FindGame(ctx *gin.Context) {
 	}
 
 	if Pe.doesExists() == false {
+		// wait for the other player to join, which will send gameId
+		// and his username to this player
+
 		Pe.flip()
-		userHashData.GameId = <-Pe.Ch
+		gameStarterData = <-Pe.Ch
+		userHashData.GameId = gameStarterData.GameId
 		userHashData.Color = core.BlackCell
-		gameHashData.Black = username
+
+		addGame(
+			userHashData.GameId,
+			username,                 // black player username
+			gameStarterData.Username, // white player username
+		)
 	} else {
+		// generate the game id, and send it to the channel
+		// where a player is already waiting
 		Pe.flip()
-		userHashData.GameId = core.GetUniqueId()
-		Pe.Ch <- userHashData.GameId
+		gameStarterData.GameId = core.GetUniqueId()
+		gameStarterData.Username = username
+		Pe.Ch <- gameStarterData
+		userHashData.GameId = gameStarterData.GameId
 		userHashData.Color = core.WhiteCell
-		gameHashData.Black = username
 	}
 
 	addPlayer(username, userHashData)
-	addGame(userHashData.GameId, gameHashData, userHashData.Color)
 	ctx.JSON(200, gin.H{
 		"wsurl": os.Getenv("WSURL"),
 	})

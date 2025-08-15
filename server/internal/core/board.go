@@ -19,10 +19,23 @@ const (
 type Game struct {
 	Board   *baduk.Board
 	Player  *Player
+	OpName  string
 	Id      string
 	Turn    int
 	History []string
 	Over    chan bool
+}
+
+type GameDataRedis struct {
+	Black       string    `json:"black"`
+	White       string    `json:"white"`
+	BTime       int64     `json:"btime"`
+	WTime       int64     `json:"wtime"`
+	LastUpdated time.Time `json:"lastUpdated"`
+	Id          string    `json:"id"`
+	Turn        int       `json:"turn"`
+	History     []string  `json:"history"`
+	State       string    `json:"state"`
 }
 
 type Player struct {
@@ -30,6 +43,7 @@ type Player struct {
 	Color       int
 	DisConn     bool
 	Clk         Clock
+	OpClk       Clock
 	DisConnTime Clock
 	Rating      int
 	Game        *Game
@@ -92,6 +106,8 @@ type ReqStateMsg struct {
 type SyncMsg struct {
 	Type     string   `json:"type"`
 	GameId   string   `json:"gameId"`
+	PName    string   `json:"pname"`
+	OpName   string   `json:"opname"`
 	Color    int      `json:"color"`
 	Turn     bool     `json:"turn"`
 	State    string   `json:"state"`
@@ -110,7 +126,9 @@ func (g *Game) InitGame() {
 	g.Board.Init(19)
 	g.Turn = BlackCell
 	g.Player.Clk.Spent = 0
+	g.Player.OpClk.Spent = 0
 	g.Player.Clk.Start = time.Now()
+	g.Player.OpClk.Start = time.Now()
 }
 
 func GetUniqueId() string {
@@ -131,28 +149,46 @@ func (p *Player) CheckDisConnTime() bool {
 
 func (g *Game) CheckTimeout() bool {
 	if g.Turn == g.Player.Color {
-		g.Player.Clk.Spent += time.Since(g.Player.Clk.Start).Milliseconds()
-		g.Player.Clk.Start = time.Now()
-		if g.Player.Clk.Spent > 900000 {
+		addSpent := time.Since(g.Player.Clk.Start).Milliseconds()
+		if g.Player.Clk.Spent+addSpent > 900000 {
 			return true
 		} else {
 			return false
 		}
 	} else {
-		return false
+		addSpent := time.Since(g.Player.OpClk.Start).Milliseconds()
+		if g.Player.OpClk.Spent+addSpent > 900000 {
+			return true
+		} else {
+			return false
+		}
 	}
 }
 
 func (g *Game) TapClock(color int) {
 	if color == g.Player.Color {
 		g.Player.Clk.Spent += time.Since(g.Player.Clk.Start).Milliseconds()
+		g.Player.OpClk.Start = time.Now()
 	} else {
+		g.Player.OpClk.Spent += time.Since(g.Player.OpClk.Start).Milliseconds()
 		g.Player.Clk.Start = time.Now()
 	}
 }
 
 func (g *Game) GetTime(color int) int64 {
-	return g.Player.Clk.Spent
+	if color == g.Player.Color {
+		if g.Turn == color {
+			addSpent := time.Since(g.Player.Clk.Start).Milliseconds()
+			return g.Player.Clk.Spent + addSpent
+		}
+		return g.Player.Clk.Spent
+	} else {
+		if g.Turn == color {
+			addSpent := time.Since(g.Player.OpClk.Start).Milliseconds()
+			return g.Player.OpClk.Spent + addSpent
+		}
+		return g.Player.OpClk.Spent
+	}
 }
 
 func (g *Game) CheckTurn(color int) bool {
