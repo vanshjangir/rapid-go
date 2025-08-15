@@ -45,7 +45,7 @@ func getRating(username string) int {
 	return rating
 }
 
-func addGame(g *core.Game) error {
+func addGameToDb(g *core.Game) error {
 	player := "white"
 	if g.Player.Color == core.BlackCell {
 		player = "black"
@@ -94,7 +94,7 @@ func startGame(g *core.Game) {
 
 	core.Pmap[g.Player.Username] = g
 	g.Over = make(chan bool)
-	if err := addGame(g); err != nil {
+	if err := addGameToDb(g); err != nil {
 		log.Println("Error occurred in adding Game data:", err)
 		return
 	}

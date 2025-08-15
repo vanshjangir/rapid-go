@@ -29,7 +29,7 @@ func startGameBot(g *core.Game) {
 
 	core.Pmap[g.Player.Username] = g
 	g.Over = make(chan bool)
-	if err := addGame(g); err != nil {
+	if err := addGameToDb(g); err != nil {
 		log.Println("Error occurred in adding Game data:", err)
 		return
 	}

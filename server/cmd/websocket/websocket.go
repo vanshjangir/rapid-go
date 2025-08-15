@@ -38,7 +38,7 @@ func main() {
 
 	r.GET("/game", middleware.WsAuth, routes.ConnectPlayer)
 	r.GET("/againstbot", middleware.WsAuth, routes.ConnectAgainstBot)
-	r.GET("/spectate", middleware.WsAuth, routes.Spectate)
+	r.GET("/spectate/:gameId", middleware.WsAuth, routes.Spectate)
 
 	r.GET("/ispending", middleware.HttpAuth, routes.IsPending)
 

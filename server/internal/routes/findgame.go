@@ -16,6 +16,11 @@ type UserHashData struct {
 	Color  int    `json:"color"`
 }
 
+type GameHashData struct {
+	White string `json:"white"`
+	Black string `json:"black"`
+}
+
 type PlayerExists struct {
 	mu     sync.Mutex
 	Ch     chan string
@@ -36,9 +41,9 @@ func (pe *PlayerExists) flip() {
 	pe.Exists = !pe.Exists
 }
 
-func addPlayer(username string, hashdata UserHashData) {
+func addPlayer(username string, userHashData UserHashData) {
 	hashkey := "live_game"
-	jsondata, err := json.Marshal(hashdata)
+	jsondata, err := json.Marshal(userHashData)
 	if err != nil {
 		log.Println("Error marshling user hashdata", err)
 		return
@@ -47,14 +52,52 @@ func addPlayer(username string, hashdata UserHashData) {
 	err = pubsub.Rdb.HSet(pubsub.RdbCtx, hashkey, username, jsondata).Err()
 	if err != nil {
 		log.Printf("Failed to set player %v to game %v: %v\n",
-			username, hashdata, err)
+			username, userHashData, err)
 	} else {
-		log.Printf("Player %s is now in game %v\n", username, hashdata)
+		log.Printf("Player %s is now in game %v\n", username, userHashData)
+	}
+}
+
+func addGame(gameId string, gameHashData GameHashData, color int) {
+	hashkey := "live_game"
+	exists, err := pubsub.Rdb.HExists(pubsub.RdbCtx, hashkey, gameId).Result()
+	if err != nil {
+		panic(err)
+	}
+	if exists == true {
+		jsondata, err := pubsub.Rdb.HGet(pubsub.RdbCtx, hashkey, gameId).Result()
+		if err != nil {
+			return
+		}
+		var tempData GameHashData
+		if err := json.Unmarshal([]byte(jsondata), &tempData); err != nil {
+			log.Println("Error in Unmarshalling json for setupGame: ", err)
+			return
+		}
+		if color == core.BlackCell {
+			gameHashData.Black = tempData.Black
+		} else {
+			gameHashData.White = tempData.White
+		}
+	}
+
+	jsondata, err := json.Marshal(gameHashData)
+	if err != nil {
+		log.Println("Error marshling user hashdata", err)
+		return
+	}
+	err = pubsub.Rdb.HSet(pubsub.RdbCtx, hashkey, gameId, jsondata).Err()
+	if err != nil {
+		log.Printf("Failed to set player %v to game %v: %v\n",
+			gameId, gameHashData, err)
+	} else {
+		log.Printf("Player %s is now in game %v\n", gameId, gameHashData)
 	}
 }
 
 func FindGame(ctx *gin.Context) {
-	var hashdata UserHashData
+	var userHashData UserHashData
+	var gameHashData GameHashData
 	usernameItf, exists := ctx.Get("username")
 	if !exists {
 		ctx.JSON(500, gin.H{"error": "Internal server error"})
@@ -69,16 +112,19 @@ func FindGame(ctx *gin.Context) {
 
 	if Pe.doesExists() == false {
 		Pe.flip()
-		hashdata.GameId = <-Pe.Ch
-		hashdata.Color = core.BlackCell
+		userHashData.GameId = <-Pe.Ch
+		userHashData.Color = core.BlackCell
+		gameHashData.Black = username
 	} else {
 		Pe.flip()
-		hashdata.GameId = core.GetUniqueId()
-		Pe.Ch <- hashdata.GameId
-		hashdata.Color = core.WhiteCell
+		userHashData.GameId = core.GetUniqueId()
+		Pe.Ch <- userHashData.GameId
+		userHashData.Color = core.WhiteCell
+		gameHashData.Black = username
 	}
 
-	addPlayer(username, hashdata)
+	addPlayer(username, userHashData)
+	addGame(userHashData.GameId, gameHashData, userHashData.Color)
 	ctx.JSON(200, gin.H{
 		"wsurl": os.Getenv("WSURL"),
 	})
