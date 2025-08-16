@@ -11,10 +11,13 @@ const Home = () => {
   const { connect, player, destSocket } = useGlobalContext();
   const [matchStatus, setMatchStatus] = useState("");
   const token = localStorage.getItem("token") || "";
-  const httpapi = import.meta.env.VITE_HTTP_URL
+  const BACKEND_URL = import.meta.env.PROD ?
+    import.meta.env.VITE_HTTPS_URL :
+    import.meta.env.VITE_HTTP_URL;
+  const wsWsPrefix = import.meta.env.PROD ? "wss://" : "ws://";
 
   const getWsurl = async () => {
-    const response = await fetch(httpapi + "/getwsurl", {
+    const response = await fetch(BACKEND_URL + "/getwsurl", {
       headers: { Authorization : token }
     });
 
@@ -25,17 +28,18 @@ const Home = () => {
   const play = async (how: string) => {
     if (how === "bot") {
       const wsurl = await getWsurl();
-      connectToGame("ws://" + wsurl, how);
+      localStorage.setItem('wsurl', wsurl);
+      connectToGame(`${wsWsPrefix}${wsurl}`, how);
     } else {
       findGame(how);
     }
   }
 
   const connectToGame = (wsurl: string, how: string) => {
-    const uri = (how === "bot" ? "/againstbot" : "/game")
-      + "?type=new&token=" + token;
+    const params = (how === "bot" ? "/againstbot" : "/game") +
+      "?type=new&token=" + token;
     
-    const socket = connect(wsurl + uri);
+    const socket = connect(wsurl + params);
     localStorage.setItem("rectype", how);
 
     socket.onmessage = async (event: MessageEvent) => {
@@ -52,7 +56,7 @@ const Home = () => {
 
   const findGame = async (how: string) => {
     setMatchStatus("pending");
-    const response = await fetch(httpapi + "/findgame", {
+    const response = await fetch(BACKEND_URL + "/findgame", {
       headers: {
         "Authorization": token,
       },
@@ -61,7 +65,7 @@ const Home = () => {
     if (response.status === 200) {
       const wsurl = json.wsurl;
       localStorage.setItem('wsurl', wsurl);
-      connectToGame("ws://" + wsurl, how);
+      connectToGame(`${wsWsPrefix}${wsurl}`, how);
     } else {
     setMatchStatus("");
       console.log(`Error occured while finding a game ${json}`);

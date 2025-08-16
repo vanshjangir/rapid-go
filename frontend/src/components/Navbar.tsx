@@ -27,6 +27,8 @@ const Navbar: React.FC = () => {
   const [recon, setRecon] = useState(false);
   const token = localStorage.getItem("token") || "";
   const nav = useNavigate();
+  const wsWsPrefix = import.meta.env.PROD ? "wss://" : "ws://";
+  const wsHttpPrefix = import.meta.env.PROD ? "https://" : "http://";
 
   useEffect(() => {
     setLogged(isLoggedIn);
@@ -49,7 +51,8 @@ const Navbar: React.FC = () => {
     const wsurl = localStorage.getItem('wsurl');
     if (!wsurl) return;
 
-    const response = await fetch("http://" + wsurl + `/ispending?username=${username}`, {
+    const response = await fetch(
+      `${wsHttpPrefix}${wsurl}/ispending?username=${username}`, {
       method: "GET",
       headers: {
         "Authorization": token,
@@ -81,7 +84,7 @@ const Navbar: React.FC = () => {
     const rectype = localStorage.getItem("rectype") || "player" ;
     const gameType = (rectype === "player" ? "game" : "againstbot");
     const socket = connect(
-      `ws://${wsurl}/${gameType}?type=reconnect&token=${token}`
+      `${wsWsPrefix}${wsurl}/${gameType}?type=reconnect&token=${token}`
     );
 
     socket.onmessage = async (event: MessageEvent) => {

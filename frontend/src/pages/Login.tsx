@@ -23,10 +23,12 @@ const Login: React.FC = () => {
   const [error, setError] = useState("");
   const nav = useNavigate();
   const { setUsername } = useGlobalContext();
-  const httpapi = import.meta.env.VITE_HTTP_URL;
+  const BACKEND_URL = import.meta.env.PROD ?
+    import.meta.env.VITE_HTTPS_URL :
+    import.meta.env.VITE_HTTP_URL;
 
   const handleLogin = async () => {
-    const response = await fetch(httpapi + '/login', {
+    const response = await fetch(BACKEND_URL + '/login', {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -60,7 +62,7 @@ const Login: React.FC = () => {
       return;
     }
 
-    const response = await fetch(httpapi + '/login', {
+    const response = await fetch(BACKEND_URL + '/login', {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -88,7 +90,7 @@ const Login: React.FC = () => {
   };
 
   const handleGuestLogin = async () => {
-    const response = await fetch(httpapi + '/login', {
+    const response = await fetch(BACKEND_URL + '/login', {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -6,9 +6,11 @@ const ReviewGame = () => {
   const [moves, setMoves] = useState<string[]>([]);
   const { gameid } = useParams();
   const fetchGame = async () => {
-    const httpapi = import.meta.env.VITE_HTTP_URL
+    const BACKEND_URL = import.meta.env.PROD ?
+      import.meta.env.VITE_HTTPS_URL :
+      import.meta.env.VITE_HTTP_URL;
     const token = localStorage.getItem('token') || "";
-    const response = await fetch(`${httpapi}/review?gameid=${gameid}`, {
+    const response = await fetch(`${BACKEND_URL}/review?gameid=${gameid}`, {
       headers: {
         "Authorization": token
       }

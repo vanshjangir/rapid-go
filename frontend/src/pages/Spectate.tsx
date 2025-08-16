@@ -31,11 +31,14 @@ const Spectate: React.FC = () => {
   const historyDivRef = useRef<HTMLDivElement>(null);
   const msgRef = useRef<HTMLDivElement>(null);
   
-  const httpapi = import.meta.env.VITE_HTTP_URL
+  const BACKEND_URL = import.meta.env.PROD ?
+    import.meta.env.VITE_HTTPS_URL :
+    import.meta.env.VITE_HTTP_URL;
   const token = localStorage.getItem("token") || "";
   const { gameId } = useParams();
   const [pname, setPname] = useState<string>("Black");
   const [opname, setOpname] = useState<string>("White");
+  const wsWsPrefix = import.meta.env.PROD ? "wss://" : "ws://";
 
   let playerTime = 900;
   let opponentTime = 900;
@@ -133,7 +136,7 @@ const Spectate: React.FC = () => {
   };
   
   const getWsurl = async () => {
-    const response = await fetch(httpapi + "/getwsurl", {
+    const response = await fetch(BACKEND_URL + "/getwsurl", {
       headers: { Authorization : token }
     });
 
@@ -147,7 +150,7 @@ const Spectate: React.FC = () => {
 
     const wsurl = await getWsurl();
     socketRef.current = new WebSocket(
-      "ws://" + wsurl + `/spectate/${gameId}` + "?token=" + token
+      `${wsWsPrefix}${wsurl}/spectate/${gameId}?token=${token}`
     );
     if (socketRef.current) {
       socketRef.current.onmessage = async (event: MessageEvent) => {

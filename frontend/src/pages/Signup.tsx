@@ -20,10 +20,12 @@ const Signup: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const nav = useNavigate();
-  const httpapi = import.meta.env.VITE_HTTP_URL;
+  const BACKEND_URL = import.meta.env.PROD ?
+    import.meta.env.VITE_HTTPS_URL :
+    import.meta.env.VITE_HTTP_URL;
 
   const handleSignup = async () => {
-    const response = await fetch(httpapi + '/signup', {
+    const response = await fetch(BACKEND_URL + '/signup', {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

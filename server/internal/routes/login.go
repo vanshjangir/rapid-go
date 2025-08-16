@@ -81,7 +81,12 @@ func loginByEmail(ctx *gin.Context, req *loginData) {
 		return
 	}
 
-	log.Println("Login successful for email:", req.Email, "and username:", username)
+	log.Println(
+		"Login successful for email:",
+		req.Email,
+		"and username:",
+		username,
+	)
 	ctx.JSON(200, gin.H{
 		"message":  "Login successful",
 		"token":    TOKEN_TYPE_JWT + token,
@@ -89,8 +94,13 @@ func loginByEmail(ctx *gin.Context, req *loginData) {
 	})
 }
 
-func verifyGoogleToken(ctx context.Context, token string) (*oauth2.Tokeninfo, error) {
-	oauth2Service, err := oauth2.NewService(ctx, option.WithAPIKey(os.Getenv("GOOGLE_CLIENT_ID")))
+func verifyGoogleToken(
+	ctx context.Context, token string,
+) (*oauth2.Tokeninfo, error) {
+	oauth2Service, err := oauth2.NewService(
+		ctx,
+		option.WithAPIKey(os.Getenv("GOOGLE_CLIENT_ID")),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -107,13 +117,19 @@ func loginByGoogle(ctx *gin.Context, req *loginData) {
 	tokenInfo, err := verifyGoogleToken(ctx, req.Credential)
 	if err != nil {
 		log.Println("ERROR:", err)
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Google token"})
+		ctx.JSON(
+			http.StatusUnauthorized,
+			gin.H{"error": "Invalid Google token"},
+		)
 		return
 	}
 
 	email := tokenInfo.Email
 	if email == "" {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Google token does not contain valid email"})
+		ctx.JSON(
+			http.StatusUnauthorized,
+			gin.H{"error": "Google token does not contain valid email"},
+		)
 		return
 	}
 
@@ -125,7 +141,11 @@ func loginByGoogle(ctx *gin.Context, req *loginData) {
 		if err == sql.ErrNoRows {
 			uniqueId := int(uuid.New().ID())
 			username = "U" + strconv.Itoa(uniqueId)
-			_, err = db.Exec("INSERT INTO users (email, username) VALUES ($1, $2)", email, username)
+			_, err = db.Exec(
+				"INSERT INTO users (email, username) VALUES ($1, $2)",
+				email,
+				username,
+			)
 			if err != nil {
 				ctx.JSON(500, gin.H{"error": "Error creating user"})
 				return
@@ -135,7 +155,12 @@ func loginByGoogle(ctx *gin.Context, req *loginData) {
 		}
 	}
 
-	log.Println("Login successful for Google user:", email, "and username:", username)
+	log.Println(
+		"Login successful for Google user:",
+		email,
+		"and username:",
+		username,
+	)
 	ctx.JSON(200, gin.H{
 		"message":  "Google Login successful",
 		"token":    TOKEN_TYPE_OAUTH + req.Credential,

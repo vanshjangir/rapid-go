@@ -24,7 +24,9 @@ import {
 const Profile = () => {
   const nav = useNavigate();
   const { username } = useParams();
-  const httpapi = import.meta.env.VITE_HTTP_URL;
+  const BACKEND_URL = import.meta.env.PROD ?
+    import.meta.env.VITE_HTTPS_URL :
+    import.meta.env.VITE_HTTP_URL;
   const [userData, setUserData] = useState<UserProfileData | null>(null);
   const token = localStorage.getItem('token') || "";
   const [textAreaVis, setTextAreaVis] = useState<boolean>(false);
@@ -32,7 +34,7 @@ const Profile = () => {
 
   const getData = async () => {
     try {
-      const response = await fetch(httpapi + `/profile?username=${username}`, {
+      const response = await fetch(BACKEND_URL + `/profile?username=${username}`, {
         method: "GET",
       });
       const data = await response.json();
@@ -43,7 +45,7 @@ const Profile = () => {
   };
 
   const changeUsername = async () => {
-    const response = await fetch(httpapi + `/changeusername`, {
+    const response = await fetch(BACKEND_URL + `/changeusername`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
