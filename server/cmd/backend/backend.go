@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -16,9 +17,16 @@ import (
 )
 
 func setupRedis() {
+	redisAddr := os.Getenv("REDIS_ADDR")
 	pubsub.Rdb = redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
+		Addr: redisAddr,
 	})
+
+	_, err := pubsub.Rdb.Ping(pubsub.RdbCtx).Result()
+	if err != nil {
+		log.Fatalf("Could not connect to Redis: %v\n", err)
+	}
+	log.Println("Successfully connected to Redis!")
 }
 
 func main() {
@@ -40,8 +48,7 @@ func main() {
 	r.POST("/changeusername", middleware.HttpAuth, routes.ChangeUsername)
 
 	if err := godotenv.Load("../../.env"); err != nil {
-		log.Fatal("Error loading env variables: ", err)
-		return
+		log.Println("Error loading env variables: ", err)
 	}
 
 	routes.Pe = new(routes.PlayerExists)
