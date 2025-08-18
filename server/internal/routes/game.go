@@ -177,7 +177,7 @@ func setupGame(g *core.Game) {
 		log.Println("Error in Unmarshalling json for setupGame: ", err)
 		return
 	}
-	
+
 	g.Id = gameData["gameId"].(string)
 	g.Player.Color = int(gameData["color"].(float64))
 

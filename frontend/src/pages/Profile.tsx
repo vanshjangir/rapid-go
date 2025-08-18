@@ -454,8 +454,11 @@ if (!userData)
                       </Td>
                       <Td color="gray.300" fontWeight="500">
                         {
-                          new Date(game.date.split(" ")[0]).toLocaleDateString('en-US', {
-                            day: 'numeric', month: 'short', year: 'numeric'
+                          new Date(game.created_at.split(" ")[0])
+                          .toLocaleDateString('en-US', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
                           }).replace(/(\d+)/, (day: any) => {
                             const s = ["th", "st", "nd", "rd"];
                             const v = day % 100;

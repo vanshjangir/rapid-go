@@ -138,9 +138,9 @@ const Navbar: React.FC = () => {
             )}
           </Flex>
 
-          <HStack spacing={6} display={{ base: "none", md: "flex" }} align="center">
+          <HStack spacing={2} display={{ base: "none", md: "flex" }} align="center">
             {logged ? (
-              <HStack spacing={6}>
+              <HStack spacing={2}>
                 <Link
                   onClick={() => nav(`/profile/${username}`)}
                   color="orange.400"

@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"strings"
 	"time"
-	"math"
 
 	"github.com/gorilla/websocket"
 	"github.com/vanshjangir/rapid-go/server/internal/database"
@@ -43,7 +43,7 @@ func saveGame(g *Game, winner int, wonby string) error {
 	db := database.GetDatabase()
 	updateQuery := `
 		UPDATE games SET
-		winner = $2, wonby = $3, moves = $4, date = $5
+		winner = $2, wonby = $3, moves = $4
 		WHERE gameid = $1
 	`
 	if _, err := db.Exec(
@@ -52,7 +52,6 @@ func saveGame(g *Game, winner int, wonby string) error {
 		winner,
 		wonby,
 		strings.Join(g.History, "/"),
-		time.Now().UTC(),
 	); err != nil {
 		return err
 	}
@@ -61,12 +60,12 @@ func saveGame(g *Game, winner int, wonby string) error {
 
 func getNewRating(pr int, opr int, won bool) int {
 	score := 1.0
-	if won == false{
+	if won == false {
 		score = 0
 	}
-	expectedScore := 1/(1 + math.Pow(10, float64((pr - opr)/400)))
+	expectedScore := 1 / (1 + math.Pow(10, float64((pr-opr)/400)))
 	var k float64 = 20
-	newRating := float64(pr) + k*(score - expectedScore)
+	newRating := float64(pr) + k*(score-expectedScore)
 	return int(newRating)
 }
 

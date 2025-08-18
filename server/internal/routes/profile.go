@@ -8,10 +8,10 @@ import (
 )
 
 type RecentGame struct {
-	GameId   string `json:"gameid"`
-	Opponent string `json:"opponent"`
-	Result   string `json:"result"`
-	Date     string `json:"date"`
+	GameId    string `json:"gameid"`
+	Opponent  string `json:"opponent"`
+	Result    string `json:"result"`
+	CreatedAt string `json:"created_at"`
 }
 
 type UserProfileData struct {
@@ -53,10 +53,11 @@ func Profile(ctx *gin.Context) {
 	data.Losses = data.GamesPlayed - data.Wins
 
 	query = `
-	SELECT gameid, white, black, winner, date
+	SELECT gameid, white, black, winner, created_at
 	FROM
 	games
-	WHERE black = $1 OR white = $1
+	WHERE (black = $1 OR white = $1)
+	AND winner IS NOT NULL
 	ORDER BY created_at DESC LIMIT 10`
 
 	if rows, err := db.Query(query, username); err != nil {
@@ -69,7 +70,10 @@ func Profile(ctx *gin.Context) {
 			var white string
 			var black string
 			var winner int
-			rows.Scan(&recentGame.GameId, &white, &black, &winner, &recentGame.Date)
+			rows.Scan(
+				&recentGame.GameId, &white, &black, &winner,
+				&recentGame.CreatedAt,
+			)
 
 			if white == username {
 				if winner == 1 {

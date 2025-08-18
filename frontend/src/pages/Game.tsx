@@ -12,6 +12,7 @@ import {
   redrawCanvas,
   retainOldState,
   decodeState,
+  BLACK_CELL,
 } from "../utils/board";
 import {
   Box,
@@ -20,7 +21,8 @@ import {
   VStack,
   HStack,
   Text,
-  Input
+  Input,
+  Circle
 } from "@chakra-ui/react";
 
 const Game: React.FC = () => {
@@ -39,6 +41,7 @@ const Game: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [pname, setPname] = useState<string>("");
   const [opname, setOpname] = useState<string>("");
+  const [currentTurn, setCurrentTurn] = useState<boolean>(false);
 
   let playerTime = 900;
   let opponentTime = 900;
@@ -70,6 +73,7 @@ const Game: React.FC = () => {
         return;
       }
       gameState.turn = !gameState.turn;
+      setCurrentTurn(gameState.turn);
       showMoveStatus(move);
       placeStone(canvasRef, ctxRef, item.x, item.y, item.c);
     });
@@ -105,6 +109,7 @@ const Game: React.FC = () => {
             if (!gameState.history) gameState.history = [];
             gameState.history.push(msg.move);
             gameState.turn = !gameState.turn;
+            setCurrentTurn(gameState.turn);
             updateHistory(gameState.history);
             showMoveStatus("Pass");
           } else {
@@ -121,6 +126,7 @@ const Game: React.FC = () => {
           if (msg.move === "ps") {
             gameState.history.push(msg.move);
             gameState.turn = !gameState.turn;
+            setCurrentTurn(gameState.turn);
             updateHistory(gameState.history);
             showMoveStatus("Pass");
           } else {
@@ -144,6 +150,7 @@ const Game: React.FC = () => {
 
           setPname(gameState.pname)
           setOpname(gameState.opname)
+          setCurrentTurn(gameState.turn);
 
           gameState.history = msg.history;
           playerTime = 900 - Math.round(msg.selfTime / 1000);
@@ -344,6 +351,7 @@ const Game: React.FC = () => {
       history: []
     };
 
+    setCurrentTurn(gameStateRef.current.turn);
     setupSocket();
     getGameState();
     setupClock();
@@ -417,37 +425,77 @@ const Game: React.FC = () => {
             boxShadow="0 20px 40px rgba(0, 0, 0, 0.4)"
           >
             <VStack spacing={2} textAlign="center">
-              <Text fontSize="xl" fontWeight="600" color="orange.200">{opname}</Text>
+              <HStack w={"200px"} spacing={3} alignItems="center" justifyContent="center">
+                <Circle 
+                  size="20px"
+                  position={"absolute"}
+                  left={"20px"}
+                  bg={
+                    1 - (gameStateRef.current?.color || 0) === BLACK_CELL ?
+                    "#2D3748" : "#F7FAFC"
+                  } 
+                  border="2px solid" 
+                  borderColor={
+                    1 - (gameStateRef.current?.color || 0) === BLACK_CELL ?
+                    "#4A5568" : "#E2E8F0"
+                  }
+                />
+                <Text fontSize="xl" fontWeight="600" color="orange.200">{opname}</Text>
+              </HStack>
               <Box 
                 as="div" 
                 ref={opponentClockRef} 
                 fontSize="2xl" 
                 fontWeight="700"
-                bg="linear-gradient(135deg, rgba(246, 173, 85, 0.2), rgba(237, 137, 54, 0.2))"
+                bg={!currentTurn 
+                  ? "linear-gradient(135deg, rgba(72, 187, 120, 0.3), rgba(56, 161, 105, 0.3))" 
+                  : ""
+                }
                 px={4}
                 py={2}
                 rounded="xl"
                 fontFamily="mono"
-                border="1px solid"
-                borderColor="orange.400"
-                textShadow="0 0 10px rgba(246, 173, 85, 0.3)"
+                border="2px solid"
+                borderColor={!currentTurn ? "green.400" : "transparent"}
+                textShadow={!currentTurn 
+                  ? "0 0 10px rgba(72, 187, 120, 0.5)" 
+                  : "0 0 10px rgba(246, 173, 85, 0.3)"
+                }
+                transition="all 0.3s ease"
               />
             </VStack>
             <VStack spacing={2} textAlign="center">
-              <Text fontSize="xl" fontWeight="600" color="orange.200">{pname}</Text>
+              <HStack spacing={3} alignItems="center" justifyContent="center">
+                <Circle 
+                  size="20px" 
+                  position={"absolute"}
+                  left={"20px"}
+                  bg={gameStateRef.current?.color === BLACK_CELL ? "#2D3748" : "#F7FAFC"} 
+                  border="2px solid" 
+                  borderColor={gameStateRef.current?.color === BLACK_CELL ? "#4A5568" : "#E2E8F0"}
+                />
+                <Text fontSize="xl" fontWeight="600" color="orange.200">{pname}</Text>
+              </HStack>
               <Box 
                 as="div" 
                 ref={playerClockRef} 
                 fontSize="2xl" 
                 fontWeight="700"
-                bg="linear-gradient(135deg, rgba(246, 173, 85, 0.2), rgba(237, 137, 54, 0.2))"
+                bg={currentTurn 
+                  ? "linear-gradient(135deg, rgba(72, 187, 120, 0.3), rgba(56, 161, 105, 0.3))" 
+                  : ""
+                }
                 px={4}
                 py={2}
                 rounded="xl"
                 fontFamily="mono"
-                border="1px solid"
-                borderColor="orange.400"
-                textShadow="0 0 10px rgba(246, 173, 85, 0.3)"
+                border="2px solid"
+                borderColor={currentTurn ? "green.400" : "transparent"}
+                textShadow={currentTurn 
+                  ? "0 0 10px rgba(72, 187, 120, 0.5)" 
+                  : "0 0 10px rgba(246, 173, 85, 0.3)"
+                }
+                transition="all 0.3s ease"
               />
             </VStack>
           </VStack>
@@ -558,7 +606,7 @@ const Game: React.FC = () => {
               flex="1"
               transition="all 0.3s ease"
               border="2px solid"
-              borderColor="red.400"
+              borderColor="red.600"
             >
               Abort
             </Button>

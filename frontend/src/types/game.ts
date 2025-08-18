@@ -85,6 +85,6 @@ export interface UserProfileData {
     gameid: string;
     opponent: string;
     result: string;
-    date: string;
+    created_at: string;
   }[];
 }
