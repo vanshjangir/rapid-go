@@ -177,6 +177,9 @@ func setupGame(g *core.Game) {
 		log.Println("Error in Unmarshalling json for setupGame: ", err)
 		return
 	}
+	
+	g.Id = gameData["gameId"].(string)
+	g.Player.Color = int(gameData["color"].(float64))
 
 	jsondata, err = getOpName(g.Id)
 	if err != nil {
@@ -190,8 +193,6 @@ func setupGame(g *core.Game) {
 		return
 	}
 
-	g.Id = gameData["gameId"].(string)
-	g.Player.Color = int(gameData["color"].(float64))
 	if g.Player.Color == core.BlackCell {
 		g.OpName = players["white"].(string)
 	} else {

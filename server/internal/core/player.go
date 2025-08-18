@@ -7,6 +7,7 @@ import (
 	"log"
 	"strings"
 	"time"
+	"math"
 
 	"github.com/gorilla/websocket"
 	"github.com/vanshjangir/rapid-go/server/internal/database"
@@ -58,12 +59,24 @@ func saveGame(g *Game, winner int, wonby string) error {
 	return nil
 }
 
-func getNewRating(pr int, or int, won bool) int {
-	return pr
+func getNewRating(pr int, opr int, won bool) int {
+	score := 1.0
+	if won == false{
+		score = 0
+	}
+	expectedScore := 1/(1 + math.Pow(10, float64((pr - opr)/400)))
+	var k float64 = 20
+	newRating := float64(pr) + k*(score - expectedScore)
+	return int(newRating)
 }
 
 func getOpRating(db *sql.DB, g *Game) int {
-	return 400
+	query := `SELECT rating FROM users WHERE username = $1`
+	opRating := 400
+	if err := db.QueryRow(query, g.OpName).Scan(&opRating); err != nil {
+		log.Println("Error fetching op rating", err)
+	}
+	return opRating
 }
 
 func updateRating(g *Game, winner int) error {
