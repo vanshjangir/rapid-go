@@ -8,6 +8,60 @@ export const WHITE_CELL = 0;
 export const BLACK_CELL = 1;
 export const EMPTY_CELL = 2;
 
+const stoneImageCache = new Map<number, HTMLImageElement>();
+let imagesLoaded = false;
+
+const preloadStoneImages = (): Promise<void> => {
+  return new Promise((resolve) => {
+    if (imagesLoaded) {
+      resolve();
+      return;
+    }
+
+    let loadedCount = 0;
+    const totalImages = 2;
+
+    const checkAllLoaded = () => {
+      loadedCount++;
+      if (loadedCount === totalImages) {
+        imagesLoaded = true;
+        resolve();
+      }
+    };
+
+    const whiteStone = new Image();
+    whiteStone.onload = checkAllLoaded;
+    whiteStone.onerror = checkAllLoaded;
+    whiteStone.src = "/whitestone.png";
+    stoneImageCache.set(WHITE_CELL, whiteStone);
+
+    const blackStone = new Image();
+    blackStone.onload = checkAllLoaded;
+    blackStone.onerror = checkAllLoaded;
+    blackStone.src = "/blackstone.png";
+    stoneImageCache.set(BLACK_CELL, blackStone);
+  });
+};
+
+preloadStoneImages();
+
+let offscreenCanvas: HTMLCanvasElement | null = null;
+let offscreenCtx: CanvasRenderingContext2D | null = null;
+
+const getOffscreenCanvas = (width: number, height: number): { canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D } => {
+  if (!offscreenCanvas || offscreenCanvas.width !== width || offscreenCanvas.height !== height) {
+    offscreenCanvas = document.createElement('canvas');
+    offscreenCanvas.width = width;
+    offscreenCanvas.height = height;
+    offscreenCtx = offscreenCanvas.getContext('2d');
+  }
+  
+  return { 
+    canvas: offscreenCanvas, 
+    ctx: offscreenCtx! 
+  };
+};
+
 export const drawBoard = async (
   canvasRef: React.RefObject<HTMLCanvasElement>,
   ctxRef: React.MutableRefObject<CanvasRenderingContext2D | null>
@@ -22,23 +76,27 @@ export const drawBoard = async (
 
   const gridCount = 19;
 
-  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "#fef3c7";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  
   context.strokeStyle = "#000";
   context.lineWidth = 1;
 
+  context.beginPath();
+  
   for (let i = 0; i < gridCount; i++) {
     const pos = (i + 1) * cellSize + boardOffset;
-
-    context.beginPath();
     context.moveTo(pos, cellSize + boardOffset);
     context.lineTo(pos, gridSize + boardOffset);
-    context.stroke();
+  }
 
-    context.beginPath();
+  for (let i = 0; i < gridCount; i++) {
+    const pos = (i + 1) * cellSize + boardOffset;
     context.moveTo(cellSize + boardOffset, pos);
     context.lineTo(gridSize + boardOffset, pos);
-    context.stroke();
   }
+  
+  context.stroke();
 
   context.font = `${gridSize/50}px Arial`;
   context.fillStyle = "#000";
@@ -49,11 +107,6 @@ export const drawBoard = async (
     const x = (i + 1) * cellSize;
     const label = String.fromCharCode(65 + i);
     context.fillText(label, x + boardOffset, boardOffset);
-  }
-
-  for (let i = 0; i < gridCount; i++) {
-    const x = (i + 1) * cellSize;
-    const label = String.fromCharCode(65 + i);
     context.fillText(label, x + boardOffset, gridSize + cellSize + boardOffset);
   }
 
@@ -61,15 +114,55 @@ export const drawBoard = async (
     const y = (i + 1) * cellSize;
     const label = (i + 1).toString();
     context.fillText(label, cellSize / 2, y + boardOffset);
+    context.fillText(label, gridSize + cellSize + boardOffset, y + boardOffset);
+  }
+
+  ctxRef.current = context;
+};
+
+const drawBoardSync = (canvas: HTMLCanvasElement, context: CanvasRenderingContext2D) => {
+  const gridCount = 19;
+
+  context.fillStyle = "#fef3c7";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  
+  context.strokeStyle = "#000";
+  context.lineWidth = 1;
+
+  context.beginPath();
+  
+  for (let i = 0; i < gridCount; i++) {
+    const pos = (i + 1) * cellSize + boardOffset;
+    context.moveTo(pos, cellSize + boardOffset);
+    context.lineTo(pos, gridSize + boardOffset);
+  }
+
+  for (let i = 0; i < gridCount; i++) {
+    const pos = (i + 1) * cellSize + boardOffset;
+    context.moveTo(cellSize + boardOffset, pos);
+    context.lineTo(gridSize + boardOffset, pos);
+  }
+  
+  context.stroke();
+
+  context.font = `${gridSize/50}px Arial`;
+  context.fillStyle = "#000";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+
+  for (let i = 0; i < gridCount; i++) {
+    const x = (i + 1) * cellSize;
+    const label = String.fromCharCode(65 + i);
+    context.fillText(label, x + boardOffset, boardOffset);
+    context.fillText(label, x + boardOffset, gridSize + cellSize + boardOffset);
   }
 
   for (let i = 0; i < gridCount; i++) {
     const y = (i + 1) * cellSize;
     const label = (i + 1).toString();
+    context.fillText(label, cellSize / 2, y + boardOffset);
     context.fillText(label, gridSize + cellSize + boardOffset, y + boardOffset);
   }
-
-  ctxRef.current = context;
 };
 
 export const redrawCanvas = (
@@ -84,27 +177,72 @@ export const redrawCanvas = (
   cellSize = newCellSize;
 
   const canvas = canvasRef.current;
-  if (canvas) {
-    canvas.width = gridSize + 2 * cellSize;
-    canvas.height = gridSize + 2 * cellSize;
-  }
-  drawBoard(canvasRef, ctxRef);
+  if (!canvas) return;
 
-  if(gameStateRef.current){
+  const newWidth = gridSize + 2 * cellSize;
+  const newHeight = gridSize + 2 * cellSize;
+
+  if (canvas.width !== newWidth || canvas.height !== newHeight) {
+    canvas.width = newWidth;
+    canvas.height = newHeight;
+  }
+
+  const mainCtx = canvas.getContext('2d');
+  if (!mainCtx) return;
+
+  const { canvas: offscreen, ctx: offscreenContext } = getOffscreenCanvas(newWidth, newHeight);
+  
+  drawBoardSync(offscreen, offscreenContext);
+  
+  if(gameStateRef.current) {
     for (let i = 0; i < 19; i++) {
       for (let j = 0; j < 19; j++) {
         if (gameStateRef.current.state[i][j] !== EMPTY_CELL) {
-          placeStone(canvasRef, ctxRef, i, j, gameStateRef.current.state[i][j]);
+          placeStoneSync(offscreenContext, i, j, gameStateRef.current.state[i][j]);
         }
       }
     }
+  }
+
+  requestAnimationFrame(() => {
+    mainCtx.drawImage(offscreen, 0, 0);
+  });
+
+  ctxRef.current = mainCtx;
+};
+
+const placeStoneSync = (
+  ctx: CanvasRenderingContext2D,
+  col: number, 
+  row: number, 
+  color: number
+) => {
+  if (!ctx || color === EMPTY_CELL) return;
+
+  const x = col * cellSize + cellSize + boardOffset;
+  const y = row * cellSize + cellSize + boardOffset;
+
+  const stoneImage = stoneImageCache.get(color);
+  if (stoneImage && stoneImage.complete) {
+    const radius = cellSize / 2;
+    ctx.drawImage(stoneImage, x - radius, y - radius, radius * 2, radius * 2);
+  } else {
+    ctx.beginPath();
+    ctx.arc(x, y, cellSize / 2 - 2, 0, 2 * Math.PI);
+    ctx.fillStyle = color === BLACK_CELL ? "#000" : "#fff";
+    ctx.fill();
+    ctx.strokeStyle = color === BLACK_CELL ? "#333" : "#ccc";
+    ctx.lineWidth = 1;
+    ctx.stroke();
   }
 };
 
 export const placeStone = (
   canvasRef: React.RefObject<HTMLCanvasElement>,
   ctxRef: React.MutableRefObject<CanvasRenderingContext2D | null>,
-  col:number, row:number, color: number
+  col: number, 
+  row: number, 
+  color: number
 ) => {
   const canvas = canvasRef.current;
   const ctx = ctxRef.current;
@@ -119,20 +257,25 @@ export const placeStone = (
     return;
   }
 
-  const x = col * cellSize + cellSize + boardOffset;
-  const y = row * cellSize + cellSize + boardOffset;
-
-  const stoneImage = new Image();
-  if (color === WHITE_CELL) {
-    stoneImage.src = "/whitestone.png";
+  const stoneImage = stoneImageCache.get(color);
+  if (stoneImage && stoneImage.complete) {
+    placeStoneSync(ctx, col, row, color);
   } else {
-    stoneImage.src = "/blackstone.png";
-  }
+    const x = col * cellSize + cellSize + boardOffset;
+    const y = row * cellSize + cellSize + boardOffset;
 
-  stoneImage.onload = () => {
-    const radius = cellSize / 2;
-    ctx.drawImage(stoneImage, x - radius, y - radius, radius * 2, radius * 2);
-  };
+    const newStoneImage = new Image();
+    if (color === WHITE_CELL) {
+      newStoneImage.src = "/whitestone.png";
+    } else {
+      newStoneImage.src = "/blackstone.png";
+    }
+
+    newStoneImage.onload = () => {
+      const radius = cellSize / 2;
+      ctx.drawImage(newStoneImage, x - radius, y - radius, radius * 2, radius * 2);
+    };
+  }
 };
 
 export const getCanvasCoordinates = (
@@ -144,7 +287,6 @@ export const getCanvasCoordinates = (
   const y = event.clientY - rect.top - cellSize - boardOffset;
   return { x: Math.round(x / cellSize), y: Math.round(y / cellSize)};
 };
-
 
 export const handleCanvasClick = (
   canvasRef: React.RefObject<HTMLCanvasElement>,
@@ -176,7 +318,8 @@ export const handleCanvasClick = (
 
 export const clearCell = (
   ctxRef: React.MutableRefObject<CanvasRenderingContext2D | null>,
-  col: number, row: number
+  col: number, 
+  row: number
 ) => {
   const ctx = ctxRef.current;
   if (!ctx) return;
@@ -189,7 +332,8 @@ export const clearCell = (
   const endx = gridSize + boardOffset;
   const endy = gridSize + boardOffset;
 
-  ctx.clearRect(x - cellSize/2, y - cellSize/2, cellSize, cellSize);
+  ctx.fillStyle = "#fef3c7";
+  ctx.fillRect(x - cellSize/2, y - cellSize/2, cellSize, cellSize);
 
   ctx.strokeStyle = "#000";
   ctx.lineWidth = 1;
@@ -221,7 +365,6 @@ export const retainOldState = (
     );
   }
 }
-
 
 export const decodeState = (
   gameStateRef: React.MutableRefObject<GameState | null>,

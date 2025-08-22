@@ -6,7 +6,6 @@ import Navbar from "../components/Navbar";
 import {
   cellSize,
   gridSize,
-  placeStone,
   BLACK_CELL,
   EMPTY_CELL,
   redrawCanvas,
@@ -62,16 +61,15 @@ const Spectate: React.FC = () => {
     newMoves.forEach((item) => {
       gameState.state[item.x][item.y] = item.c;
       if (item.c === EMPTY_CELL) {
-        placeStone(canvasRef, ctxRef, item.x, item.y, EMPTY_CELL);
         return;
       }
       gameState.turn = !gameState.turn;
       setCurrentTurn(gameState.turn);
       showMoveStatus(move);
-      placeStone(canvasRef, ctxRef, item.x, item.y, item.c);
     });
 
     gameState.history.push(move);
+    redrawCanvas(canvasRef, gameStateRef, ctxRef);
     updateHistory(gameState.history);
   }
 

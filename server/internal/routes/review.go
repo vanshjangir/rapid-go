@@ -15,9 +15,14 @@ func Review(ctx *gin.Context) {
 	gameid := ctx.Query("gameid")
 
 	var moves string
-	query := "SELECT moves FROM games WHERE gameid = $1"
+	var black string
+	var white string
+	var winner string
+	query := "SELECT moves, black, white, winner FROM games WHERE gameid = $1"
 
-	err := db.QueryRow(query, gameid).Scan(&moves)
+	err := db.QueryRow(query, gameid).Scan(
+		&moves, &black, &white, &winner,
+	)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			ctx.JSON(404, gin.H{"error": "Game not found"})
@@ -28,6 +33,9 @@ func Review(ctx *gin.Context) {
 	}
 
 	ctx.JSON(200, gin.H{
-		"moves": moves,
+		"moves":  moves,
+		"black":  black,
+		"white":  white,
+		"winner": winner,
 	})
 }

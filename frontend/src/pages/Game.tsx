@@ -6,11 +6,9 @@ import Navbar from "../components/Navbar";
 import {
   cellSize,
   gridSize,
-  placeStone,
   EMPTY_CELL,
   handleCanvasClick,
   redrawCanvas,
-  retainOldState,
   decodeState,
   BLACK_CELL,
 } from "../utils/board";
@@ -69,17 +67,16 @@ const Game: React.FC = () => {
     newMoves.forEach((item) => {
       gameState.state[item.x][item.y] = item.c;
       if (item.c === EMPTY_CELL) {
-        placeStone(canvasRef, ctxRef, item.x, item.y, EMPTY_CELL);
         return;
       }
       gameState.turn = !gameState.turn;
       setCurrentTurn(gameState.turn);
       showMoveStatus(move);
-      placeStone(canvasRef, ctxRef, item.x, item.y, item.c);
     });
 
     if (!gameState.history) gameState.history = [];
     gameState.history.push(move);
+    redrawCanvas(canvasRef, gameStateRef, ctxRef);
     updateHistory(gameState.history);
   }
 
@@ -95,12 +92,12 @@ const Game: React.FC = () => {
       case "movestatus":
         if (msg.turnStatus === false) {
           showMoveStatus("Not your turn");
-          retainOldState(canvasRef, ctxRef, gameStateRef, msg);
+          redrawCanvas(canvasRef, gameStateRef, ctxRef);
           break;
         }
         if (msg.moveStatus === false) {
           showMoveStatus("Invalid move");
-          retainOldState(canvasRef, ctxRef, gameStateRef, msg);
+          redrawCanvas(canvasRef, gameStateRef, ctxRef);
           break;
         }
         if (gameStateRef.current) {
