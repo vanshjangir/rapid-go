@@ -8,10 +8,6 @@ RUN npm install
 
 COPY . .
 
-ARG ENV_FILE
-
-COPY $ENV_FILE .env.production
-
 RUN npm run build
 
 FROM nginx:stable-alpine AS production

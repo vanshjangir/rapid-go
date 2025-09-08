@@ -1,37 +1,34 @@
 services:
   backend:
-    image: rg_backend
+    image: vanshjangir/rapid-go:backend
     build:
-      context: ./server/cmd/backend
+      context: ./server/
+      dockerfile: Backend.Dockerfile
     ports:
       - "8080:8080"
-    environment:
-      - GIN_MODE=release
-      - POSTGRES_HOST=host.docker.internal
-    env_file:
-      - ./server/.env
     extra_hosts:
       - "host.docker.internal:host-gateway"
   
   websocket:
-    image: rg_websocket
+    image: vanshjangir/rapid-go:websocket
     build:
-      context: ./server/cmd/websocket
+      context: ./server/
+      dockerfile: Websocket.Dockerfile
     ports:
       - "8000:8000"
-    environment:
-      - GIN_MODE=release
-      - POSTGRES_HOST=host.docker.internal
-    env_file:
-      - ./server/.env
     extra_hosts:
       - "host.docker.internal:host-gateway"
   
   client:
-    image: rg_client
+    image: vanshjangir/rapid-go:client
     build:
       context: ./frontend/
-      args:
-        - ENV_FILE=.env.production
+    env_file:
+        - ./frontend/.env
     ports:
       - "5173:80"
+
+  redis:
+    image: vanshjangir/rapid-go:redis
+    ports:
+      - "6379:6379"

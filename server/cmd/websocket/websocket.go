@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"crypto/tls"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -19,9 +20,20 @@ import (
 
 func setupRedis() {
 	redisAddr := os.Getenv("REDIS_ADDR")
-	pubsub.Rdb = redis.NewClient(&redis.Options{
-		Addr: redisAddr,
-	})
+	redisPassword := os.Getenv("REDIS_PASSWORD")
+	useTLS := os.Getenv("REDIS_TLS") == "true"
+
+	opts := &redis.Options{
+		Addr:     redisAddr,
+		Password: redisPassword,
+	}
+
+	if useTLS {
+		opts.Username = "default"
+		opts.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+	}
+
+	pubsub.Rdb = redis.NewClient(opts)
 
 	_, err := pubsub.Rdb.Ping(pubsub.RdbCtx).Result()
 	if err != nil {
@@ -44,7 +56,7 @@ func main() {
 
 	r.GET("/ispending", middleware.HttpAuth, routes.IsPending)
 
-	if err := godotenv.Load("../../.env"); err != nil {
+	if err := godotenv.Load("../../.dev.env"); err != nil {
 		log.Println("Error loading env variables: ", err)
 	}
 
