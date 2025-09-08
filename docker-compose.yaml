@@ -23,6 +23,9 @@ services:
     image: vanshjangir/rapid-go:client
     build:
       context: ./frontend/
+      args:
+        VITE_HTTPS_URL: ${VITE_HTTPS_URL}
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
     ports:
       - "5173:80"
 
